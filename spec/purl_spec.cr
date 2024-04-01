@@ -18,6 +18,11 @@ describe Purl do
 
   it "parse a URL" do
     p = Purl::PackageURL.parse("scheme:type/namespace/name@version?qualifiers#subpath")
-    puts p
+    p.type.should eq("type")
+    p.namespace.should eq("namespace")
+    p.name.should eq("name")
+    p.version.should eq("version")
+    p.qualifiers.should eq("qualifiers")
+    p.subpath.should eq("subpath")
   end
 end

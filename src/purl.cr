@@ -3,12 +3,12 @@ module Purl
   VERSION = "0.1.0"
 
   class PackageURL
-    @type : String
-    @namespace : String
-    @name : String
-    @version : String
-    @qualifiers : String
-    @subpath : String
+    property type : String
+    property namespace : String
+    property name : String
+    property version : String
+    property qualifiers : String
+    property subpath : String
 
     def initialize(type_str : String, namespace : String, name : String, version : String, qualifiers : String, subpath : String)
       @type = type_str
@@ -39,7 +39,7 @@ module Purl
       qualifiers = match[6]
       subpath = match[7]
 
-      PackageURL.new(type_s, name, namespace, version, qualifiers, subpath)
+      PackageURL.new(type_s, namespace, name, version, qualifiers, subpath)
     end
   end
 end
