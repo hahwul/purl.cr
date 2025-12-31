@@ -62,7 +62,7 @@ module Purl
 
       type_s = match[1]
       path_part = match[2]
-      version = match[3]?
+      version = match[3]?.try { |v| URI.decode(v) }
       qualifiers = match[4]?
       subpath = match[5]?
 

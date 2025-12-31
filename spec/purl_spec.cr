@@ -111,6 +111,14 @@ describe Purl do
         parsed.name.should eq(original.name)
         parsed.version.should eq(original.version)
       end
+
+      it "handles version with special characters" do
+        original = Purl::PackageURL.new("npm", nil, "package", "1.0.0+build.123", nil, nil)
+        purl_str = original.to_s
+        purl_str.should contain("%2B")  # + should be encoded
+        parsed = Purl::PackageURL.parse(purl_str)
+        parsed.version.should eq("1.0.0+build.123")
+      end
     end
   end
 end
