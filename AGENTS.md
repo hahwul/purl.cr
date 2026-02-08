@@ -1,4 +1,4 @@
-# Copilot Instructions for purl.cr
+# AGENTS.md for purl.cr
 
 This is a Crystal implementation of the [Package URL (purl) specification](https://github.com/package-url/purl-spec).
 
