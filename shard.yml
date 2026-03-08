@@ -1,9 +1,9 @@
 name: purl
-version: 0.2.0
+version: 0.1.0
 
 authors:
   - HAHWUL <hahwul@gmail.com>
 
-crystal: '>= 1.11.2'
+crystal: '>= 1.17.0'
 
 license: MIT
