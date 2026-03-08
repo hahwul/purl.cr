@@ -49,14 +49,15 @@ if quals = purl.qualifiers
   puts "distro: #{quals["distro"]}"
 end
 
-# --- Modifying qualifiers ---
+# --- Creating a new purl with different qualifiers ---
 
-puts "\n--- Modifying Qualifiers ---"
+puts "\n--- Creating with Qualifiers ---"
 purl = Purl::PackageURL.new("npm", nil, "express", "4.18.0")
-puts "Before: #{purl.to_s}"
+puts "Without: #{purl.to_s}"
 
-purl.qualifiers = {"engine" => "node", "runtime" => "v18"}
-puts "After:  #{purl.to_s}"
+purl_with_quals = Purl::PackageURL.new("npm", nil, "express", "4.18.0",
+  qualifiers: {"engine" => "node", "runtime" => "v18"})
+puts "With:    #{purl_with_quals.to_s}"
 
 # --- Qualifier key normalization ---
 
