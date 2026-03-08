@@ -29,9 +29,9 @@ module Purl
     # Valid qualifier key pattern: starts with lowercase letter, contains only [a-z0-9._\-]
     QUALIFIER_KEY_PATTERN = /^[a-z][a-z0-9._\-]*$/
 
-    # Characters that should NOT be percent-encoded in qualifier values
+    # Characters that should NOT be percent-encoded in qualifier values (beyond unreserved chars)
     # Per spec: qualifier values are percent-encoded strings, but `:` and `/` should not be encoded
-    QUALIFIER_VALUE_SAFE = ":/@"
+    QUALIFIER_VALUE_SAFE = ":/"
 
     property type : String
     property namespace : String?
@@ -95,49 +95,50 @@ module Purl
 
     # Returns the Package URL as a string in the purl format.
     def to_s : String
-      String.build do |str|
-        str << SCHEME << ":" << @type
-
-        if ns = @namespace
-          str << "/"
-          # Split namespace by `/` and encode each segment individually
-          segments = ns.split("/")
-          segments.each_with_index do |seg, i|
-            str << "/" if i > 0
-            str << encode_component(seg)
-          end
-        end
-
-        str << "/" << encode_component(@name)
-
-        if ver = @version
-          str << "@" << encode_component(ver)
-        end
-
-        if quals = @qualifiers
-          str << "?"
-          # Sort by key alphabetically
-          sorted_keys = quals.keys.sort
-          sorted_keys.each_with_index do |key, i|
-            str << "&" if i > 0
-            str << key << "=" << encode_qualifier_value(quals[key])
-          end
-        end
-
-        if sub = @subpath
-          str << "#"
-          # Split subpath and encode each segment
-          segments = sub.split("/")
-          segments.each_with_index do |seg, i|
-            str << "/" if i > 0
-            str << encode_component(seg)
-          end
-        end
+      String.build do |io|
+        to_s(io)
       end
     end
 
+    # Writes the Package URL in purl format directly to the given IO.
     def to_s(io : IO) : Nil
-      io << to_s
+      io << SCHEME << ":" << @type
+
+      if ns = @namespace
+        io << "/"
+        # Split namespace by `/` and encode each segment individually
+        segments = ns.split("/")
+        segments.each_with_index do |seg, i|
+          io << "/" if i > 0
+          io << encode_component(seg)
+        end
+      end
+
+      io << "/" << encode_component(@name)
+
+      if ver = @version
+        io << "@" << encode_component(ver)
+      end
+
+      if quals = @qualifiers
+        io << "?"
+        # Sort by key alphabetically
+        sorted_keys = quals.keys.sort
+        sorted_keys.each_with_index do |key, i|
+          io << "&" if i > 0
+          io << key << "=" << encode_qualifier_value(quals[key])
+        end
+      end
+
+      if sub = @subpath
+        io << "#"
+        # Split subpath and encode each segment
+        segments = sub.split("/")
+        segments.each_with_index do |seg, i|
+          io << "/" if i > 0
+          io << encode_component(seg)
+        end
+      end
     end
 
     # Equality comparison: two PackageURLs are equal if all normalized components match.
@@ -253,17 +254,17 @@ module Purl
     end
 
     private def normalize_subpath(subpath : String) : String?
-      segments = subpath.split("/").reject { |s| s.empty? || s == "." || s == ".." }
-      return nil if segments.empty?
-      segments.join("/")
+      self.class.normalize_subpath_segments(subpath.split("/"))
     end
 
     private def self.decode_and_normalize_subpath(raw : String) : String?
-      segments = raw.split("/")
-        .map { |s| URI.decode(s) }
-        .reject { |s| s.empty? || s == "." || s == ".." }
-      return nil if segments.empty?
-      segments.join("/")
+      normalize_subpath_segments(raw.split("/").map { |s| URI.decode(s) })
+    end
+
+    protected def self.normalize_subpath_segments(segments : Array(String)) : String?
+      cleaned = segments.reject { |s| s.empty? || s == "." || s == ".." }
+      return nil if cleaned.empty?
+      cleaned.join("/")
     end
 
     private def self.parse_qualifiers(raw : String) : Hash(String, String)?
@@ -286,11 +287,11 @@ module Purl
       URI.encode_path_segment(value)
     end
 
-    # Encode qualifier value: similar to encode_component but preserves `:` and `/`
+    # Encode qualifier value: similar to encode_component but preserves characters in QUALIFIER_VALUE_SAFE
     private def encode_qualifier_value(value : String) : String
       String.build do |str|
         value.each_char do |c|
-          if c == ':' || c == '/'
+          if QUALIFIER_VALUE_SAFE.includes?(c)
             str << c
           elsif c.ascii_alphanumeric? || c == '-' || c == '.' || c == '_' || c == '~'
             str << c
