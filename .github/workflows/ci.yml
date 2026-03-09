@@ -8,12 +8,12 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
       - name: Install Crystal
-        run: brew install crystal
+        uses: crystal-lang/install-crystal@v1
 
       - name: Install dependencies
         run: shards install
