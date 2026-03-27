@@ -4,7 +4,7 @@
 
 title = "purl.cr"
 description = "Crystal implementation of the Package URL (purl) specification"
-base_url = ""
+base_url = "https://purl.cr.hahwul.com"
 
 # =============================================================================
 # Plugins
