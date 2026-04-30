@@ -666,5 +666,75 @@ describe Purl do
         p.version.should eq("1.7.0")
       end
     end
+
+    # =========================================================================
+    # %2F preservation in segments (security: SBOM matching collisions)
+    # =========================================================================
+    describe "%2F preservation" do
+      it "preserves %2F inside a namespace segment so it is not conflated with the path separator" do
+        a = Purl::PackageURL.parse("pkg:generic/foo%2Fbar/baz")
+        b = Purl::PackageURL.parse("pkg:generic/foo/bar/baz")
+        a.should_not eq(b)
+        a.to_s.should eq("pkg:generic/foo%2Fbar/baz")
+        b.to_s.should eq("pkg:generic/foo/bar/baz")
+      end
+
+      it "preserves %2F inside a name segment" do
+        p = Purl::PackageURL.parse("pkg:generic/foo%2Fbar")
+        p.namespace.should be_nil
+        p.name.should eq("foo%2Fbar")
+        p.to_s.should eq("pkg:generic/foo%2Fbar")
+      end
+
+      it "still decodes other percent-escapes (e.g. %40)" do
+        p = Purl::PackageURL.parse("pkg:npm/%40angular/animation@12.3.1")
+        p.namespace.should eq("@angular")
+      end
+
+      it "round-trips %2F together with other encoded characters" do
+        p = Purl::PackageURL.parse("pkg:generic/a%40b%2Fc/d")
+        p.namespace.should eq("a@b%2Fc")
+        p.to_s.should eq("pkg:generic/a%40b%2Fc/d")
+      end
+    end
+
+    # =========================================================================
+    # Subpath traversal hardening
+    # =========================================================================
+    describe "subpath traversal" do
+      it "strips traversal segments hidden behind percent-encoded slash" do
+        p = Purl::PackageURL.parse("pkg:generic/x#foo/%2E%2E%2Fbar")
+        # Decoded segment "../bar" is split into ["..", "bar"]; the leading
+        # ".." is filtered, leaving "foo/bar".
+        p.subpath.should eq("foo/bar")
+      end
+
+      it "strips traversal segments passed via the constructor" do
+        p = Purl::PackageURL.new("generic", nil, "x", subpath: "%2E%2E/bar")
+        p.subpath.should eq("bar")
+      end
+
+      it "strips fully-percent-encoded traversal" do
+        p = Purl::PackageURL.parse("pkg:generic/x#%2E%2E/secret")
+        p.subpath.should eq("secret")
+      end
+    end
+
+    # =========================================================================
+    # Qualifier key validation in the parser
+    # =========================================================================
+    describe "qualifier key validation" do
+      it "rejects percent-encoded qualifier keys" do
+        expect_raises(Purl::Error, /Invalid qualifier key/) do
+          Purl::PackageURL.parse("pkg:generic/x?%41rch=amd64")
+        end
+      end
+
+      it "rejects qualifier keys with invalid characters" do
+        expect_raises(Purl::Error, /Invalid qualifier key/) do
+          Purl::PackageURL.parse("pkg:generic/x?ar ch=amd64")
+        end
+      end
+    end
   end
 end

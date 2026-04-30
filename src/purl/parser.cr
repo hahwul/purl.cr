@@ -50,21 +50,24 @@ module Purl
       # Step 5: Split off version from right side using `@`
       version : String? = nil
       if idx = remainder.rindex('@')
-        version = URI.decode(remainder[(idx + 1)..])
+        version = Encoder.decode_segment(remainder[(idx + 1)..])
         remainder = remainder[...idx]
       end
 
-      # Step 6: Split off name from right side using last `/`
+      # Step 6: Split off name from right side using last `/`. Each segment
+      # is decoded via Encoder.decode_segment so an encoded slash (%2F)
+      # inside a single segment is preserved instead of being conflated
+      # with the structural separator (purl spec ECMA-427).
       name : String
       namespace : String? = nil
 
       if idx = remainder.rindex('/')
-        name = URI.decode(remainder[(idx + 1)..])
+        name = Encoder.decode_segment(remainder[(idx + 1)..])
         namespace_raw = remainder[...idx]
-        namespace = namespace_raw.split("/").map { |seg| URI.decode(seg) }.join("/")
+        namespace = namespace_raw.split("/").map { |seg| Encoder.decode_segment(seg) }.join("/")
         namespace = nil if namespace.strip.empty?
       else
-        name = URI.decode(remainder)
+        name = Encoder.decode_segment(remainder)
       end
 
       raise Purl::Error.new("Invalid Package URL: name must not be empty") if name.strip.empty?
@@ -81,6 +84,12 @@ module Purl
         key, _, value = pair.partition("=")
         key = key.downcase
         next if value.strip.empty?
+        # Per spec, qualifier keys are unencoded ASCII identifiers — reject
+        # anything that doesn't match the canonical form so two different
+        # encodings of the same key cannot survive into the parsed result.
+        unless QUALIFIER_KEY_PATTERN.matches?(key)
+          raise Purl::Error.new("Invalid qualifier key '#{key}': must start with a letter and contain only lowercase ASCII letters, digits, '.', '_' or '-'")
+        end
         decoded_value = URI.decode(value)
         result[key] = decoded_value
       end
