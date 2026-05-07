@@ -59,4 +59,4 @@ puts "Subpath:    #{purl.subpath}"
 puts "\n--- Equality ---"
 a = Purl::PackageURL.new("npm", "@babel", "core", "7.20.0")
 b = Purl::PackageURL.new("npm", "@babel", "core", "7.20.0")
-puts "Equal: #{a == b}"  # => true
+puts "Equal: #{a == b}" # => true
