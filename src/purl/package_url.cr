@@ -82,7 +82,7 @@ module Purl
 
       if quals = @qualifiers
         io << "?"
-        quals.keys.sort.each_with_index do |key, i|
+        quals.keys.sort!.each_with_index do |key, i|
           io << "&" if i > 0
           io << key << "=" << Encoder.encode_qualifier_value(quals[key])
         end
@@ -123,7 +123,7 @@ module Purl
     end
 
     private def normalize_qualifiers(qualifiers : Hash(String, String)?) : Hash(String, String)?
-      return nil unless qualifiers
+      return unless qualifiers
 
       normalized = Hash(String, String).new
       qualifiers.each do |key, value|

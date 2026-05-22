@@ -1,5 +1,12 @@
 name: purl
 version: 0.1.0
+description: |
+  A Crystal implementation of the Package URL (purl) spec.
+  Parses, validates, and serializes purl strings such as
+  pkg:github/owner/repo@1.2.3.
+repository: https://github.com/hahwul/purl.cr
+homepage: https://github.com/hahwul/purl.cr
+documentation: https://github.com/hahwul/purl.cr#readme
 
 authors:
   - HAHWUL <hahwul@gmail.com>
@@ -7,3 +14,8 @@ authors:
 crystal: '>= 1.17.0'
 
 license: MIT
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    branch: master

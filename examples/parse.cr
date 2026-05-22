@@ -28,7 +28,7 @@ purl_strings.each do |str|
   if quals = purl.qualifiers
     puts "  Qualifiers: #{quals}"
   end
-  puts "  Roundtrip:  #{purl.to_s}"
+  puts "  Roundtrip:  #{purl}"
   puts ""
 end
 
