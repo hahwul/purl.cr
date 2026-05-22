@@ -42,7 +42,7 @@ module Purl
 
     def self.normalize_subpath_segments(segments : Array(String)) : String?
       cleaned = segments.reject { |s| s.empty? || s == "." || s == ".." }
-      return nil if cleaned.empty?
+      return if cleaned.empty?
       cleaned.join("/")
     end
   end

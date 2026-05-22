@@ -15,7 +15,7 @@ deb = Purl::PackageURL.new(
     "distro" => "jessie",
   }
 )
-puts "Deb purl: #{deb.to_s}"
+puts "Deb purl: #{deb}"
 # => pkg:deb/debian/curl@7.50.3-1?arch=amd64&distro=jessie
 
 # Docker image with tag and repository
@@ -26,7 +26,7 @@ docker = Purl::PackageURL.new(
     "tag"            => "latest",
   }
 )
-puts "Docker purl: #{docker.to_s}"
+puts "Docker purl: #{docker}"
 
 # Maven with classifier
 maven = Purl::PackageURL.new(
@@ -36,7 +36,7 @@ maven = Purl::PackageURL.new(
     "classifier" => "sources",
   }
 )
-puts "Maven purl: #{maven.to_s}"
+puts "Maven purl: #{maven}"
 
 # --- Accessing qualifiers ---
 
@@ -53,11 +53,11 @@ end
 
 puts "\n--- Creating with Qualifiers ---"
 purl = Purl::PackageURL.new("npm", nil, "express", "4.18.0")
-puts "Without: #{purl.to_s}"
+puts "Without: #{purl}"
 
 purl_with_quals = Purl::PackageURL.new("npm", nil, "express", "4.18.0",
   qualifiers: {"engine" => "node", "runtime" => "v18"})
-puts "With:    #{purl_with_quals.to_s}"
+puts "With:    #{purl_with_quals}"
 
 # --- Qualifier key normalization ---
 
@@ -71,7 +71,7 @@ purl = Purl::PackageURL.new(
     "OS_Type" => "linux",
   }
 )
-puts "Normalized: #{purl.to_s}"
+puts "Normalized: #{purl}"
 puts "Qualifiers: #{purl.qualifiers}"
 # Keys lowercased, "empty" removed due to whitespace-only value
 

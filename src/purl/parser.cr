@@ -77,7 +77,7 @@ module Purl
 
     # Parses qualifier query string into a hash of key-value pairs.
     def self.parse_qualifiers(raw : String) : Hash(String, String)?
-      return nil if raw.strip.empty?
+      return if raw.strip.empty?
       result = Hash(String, String).new
       raw.split("&").each do |pair|
         next if pair.empty?
