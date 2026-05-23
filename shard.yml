@@ -1,5 +1,5 @@
 name: purl
-version: 0.1.0
+version: 0.2.0
 description: |
   A Crystal implementation of the Package URL (purl) spec.
   Parses, validates, and serializes purl strings such as
