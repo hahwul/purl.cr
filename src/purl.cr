@@ -3,6 +3,7 @@
 # Spec: ECMA-427
 require "uri"
 
+require "./purl/version"
 require "./purl/error"
 require "./purl/normalizer"
 require "./purl/encoder"
@@ -10,5 +11,4 @@ require "./purl/parser"
 require "./purl/package_url"
 
 module Purl
-  VERSION = "0.2.0"
 end
