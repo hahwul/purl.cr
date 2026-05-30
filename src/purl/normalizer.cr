@@ -7,7 +7,10 @@ module Purl
       case type
       when "pypi"
         name.gsub('_', '-').downcase
-      when "npm", "golang", "deb", "github", "bitbucket"
+      when "pub"
+        # pub names are lowercased and any char outside [a-z0-9_] becomes '_'.
+        name.downcase.gsub(/[^a-z0-9_]/, '_')
+      when "npm", "golang", "deb", "github", "bitbucket", "composer", "oci"
         name.downcase
       else
         name
@@ -15,11 +18,32 @@ module Purl
     end
 
     def self.normalize_namespace(type : String, namespace : String) : String
+      normalized =
+        case type
+        when "npm", "golang", "deb", "rpm", "github", "bitbucket", "composer"
+          namespace.downcase
+        else
+          namespace
+        end
+      # The canonical purl form must not contain empty path segments, so a
+      # namespace like "a//b" collapses to "a/b". This keeps a constructed
+      # purl identical to its parsed form.
+      normalized.split("/").reject(&.empty?).join("/")
+    end
+
+    # Normalize a type-specific version. Most types store the version
+    # verbatim, but a few define case-insensitive version semantics.
+    def self.normalize_version(type : String, version : String) : String
       case type
-      when "npm", "golang", "deb", "rpm", "github", "bitbucket"
-        namespace.downcase
+      when "huggingface"
+        # The model ref / commit is case-insensitive per the spec.
+        version.downcase
+      when "oci"
+        # OCI versions are typically a `sha256:...` digest which is
+        # case-insensitive; lowercase only when it looks like a digest.
+        version.starts_with?("sha256:") ? version.downcase : version
       else
-        namespace
+        version
       end
     end
 

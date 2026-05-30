@@ -48,9 +48,9 @@ module Purl
       if ns && ns.strip.empty?
         ns = nil
       end
-      @namespace = ns ? Normalizer.normalize_namespace(@type, ns) : nil
+      @namespace = ns ? normalize_optional_namespace(@type, ns) : nil
       @name = Normalizer.normalize_name(@type, name)
-      @version = version
+      @version = version ? Normalizer.normalize_version(@type, version) : nil
       @qualifiers = normalize_qualifiers(qualifiers)
       @subpath = subpath ? Normalizer.normalize_subpath(subpath) : nil
     end
@@ -120,6 +120,13 @@ module Purl
     # Parses a Package URL string and returns a PackageURL instance.
     def self.parse(purl_string : String) : PackageURL
       Parser.parse(purl_string)
+    end
+
+    # Normalize a namespace and collapse it to nil if stripping empty path
+    # segments (e.g. "//") leaves nothing meaningful behind.
+    private def normalize_optional_namespace(type : String, namespace : String) : String?
+      normalized = Normalizer.normalize_namespace(type, namespace)
+      normalized.empty? ? nil : normalized
     end
 
     private def normalize_qualifiers(qualifiers : Hash(String, String)?) : Hash(String, String)?
