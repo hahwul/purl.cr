@@ -131,6 +131,26 @@ describe Purl do
         p = Purl::PackageURL.new("nuget", nil, "Newtonsoft.Json")
         p.name.should eq("Newtonsoft.Json")
       end
+
+      it "normalizes composer name to lowercase" do
+        p = Purl::PackageURL.new("composer", "Framework", "Laravel")
+        p.name.should eq("laravel")
+      end
+
+      it "normalizes oci name to lowercase" do
+        p = Purl::PackageURL.new("oci", nil, "Debian")
+        p.name.should eq("debian")
+      end
+
+      it "normalizes pub name to lowercase and replaces non-[a-z0-9_] chars with underscore" do
+        p = Purl::PackageURL.new("pub", nil, "Flutter_Lints")
+        p.name.should eq("flutter_lints")
+      end
+
+      it "replaces hyphens and dots in pub name with underscores" do
+        p = Purl::PackageURL.new("pub", nil, "my-cool.pkg")
+        p.name.should eq("my_cool_pkg")
+      end
     end
 
     # =========================================================================
@@ -172,6 +192,29 @@ describe Purl do
         p.namespace.should eq("org.Apache.Commons")
       end
 
+      it "normalizes composer namespace to lowercase" do
+        p = Purl::PackageURL.new("composer", "Framework", "laravel")
+        p.namespace.should eq("framework")
+      end
+
+      it "strips empty namespace segments so no '//' appears" do
+        p = Purl::PackageURL.new("generic", "a//b", "name")
+        p.namespace.should eq("a/b")
+        p.to_s.should_not contain("//")
+        p.to_s.should eq("pkg:generic/a/b/name")
+      end
+
+      it "keeps a constructed purl identical to its parsed form for collapsed namespaces" do
+        constructed = Purl::PackageURL.new("generic", "a//b", "name")
+        parsed = Purl::PackageURL.parse("pkg:generic/a//b/name")
+        (constructed == parsed).should be_true
+      end
+
+      it "collapses a namespace of only slashes to nil" do
+        p = Purl::PackageURL.new("generic", "//", "name")
+        p.namespace.should be_nil
+      end
+
       it "treats empty namespace as nil" do
         p = Purl::PackageURL.new("npm", "", "lodash")
         p.namespace.should be_nil
@@ -180,6 +223,37 @@ describe Purl do
       it "treats whitespace-only namespace as nil" do
         p = Purl::PackageURL.new("npm", "  ", "lodash")
         p.namespace.should be_nil
+      end
+    end
+
+    # =========================================================================
+    # Type-specific version normalization
+    # =========================================================================
+    describe "version normalization" do
+      it "lowercases huggingface version (case-insensitive model ref)" do
+        p = Purl::PackageURL.new("huggingface", "microsoft", "deberta", "MAIN-ABC123")
+        p.version.should eq("main-abc123")
+      end
+
+      it "preserves huggingface name case while lowercasing version" do
+        p = Purl::PackageURL.new("huggingface", "microsoft", "DialoGPT", "AbC")
+        p.name.should eq("DialoGPT")
+        p.version.should eq("abc")
+      end
+
+      it "lowercases oci version when it is a sha256 digest" do
+        p = Purl::PackageURL.new("oci", nil, "debian", "sha256:ABC123DEF")
+        p.version.should eq("sha256:abc123def")
+      end
+
+      it "leaves non-digest oci version untouched" do
+        p = Purl::PackageURL.new("oci", nil, "debian", "Bullseye")
+        p.version.should eq("Bullseye")
+      end
+
+      it "preserves version case for types without version normalization" do
+        p = Purl::PackageURL.new("npm", nil, "pkg", "1.0.0-RC1")
+        p.version.should eq("1.0.0-RC1")
       end
     end
 
@@ -664,6 +738,23 @@ describe Purl do
         p.type.should eq("hex")
         p.name.should eq("phoenix")
         p.version.should eq("1.7.0")
+      end
+
+      it "normalizes composer namespace and name to lowercase when parsing" do
+        p = Purl::PackageURL.parse("pkg:composer/Framework/Laravel")
+        p.namespace.should eq("framework")
+        p.name.should eq("laravel")
+        p.to_s.should eq("pkg:composer/framework/laravel")
+      end
+
+      it "normalizes pub name when parsing" do
+        p = Purl::PackageURL.parse("pkg:pub/Flutter_Lints")
+        p.name.should eq("flutter_lints")
+      end
+
+      it "lowercases huggingface version when parsing" do
+        p = Purl::PackageURL.parse("pkg:huggingface/microsoft/deberta@MAIN-ABC123")
+        p.version.should eq("main-abc123")
       end
     end
 
