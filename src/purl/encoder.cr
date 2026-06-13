@@ -7,23 +7,19 @@ module Purl
     # Per spec: qualifier values are percent-encoded strings, but `:` and `/` should not be encoded
     QUALIFIER_VALUE_SAFE = ":/"
 
-    # Sentinel character used to preserve %2F / %2f markers across decode→encode
-    # round-trips. The character is U+0001, which is forbidden in valid purl
-    # input (control characters are not permitted in segments) so it cannot
-    # collide with caller data.
-    SLASH_SENTINEL = "\u0001"
-
     # Decode a path segment of a purl while preserving %2F (and %2f) as a
     # literal "%2F" marker. The purl spec requires that an encoded slash
     # inside a segment NOT be conflated with the segment separator: e.g.
     # `pkg:npm/foo%2Fbar/baz` and `pkg:npm/foo/bar/baz` are distinct purls.
     # Returning a string with embedded "%2F" lets the encoder round-trip
     # the marker back out unchanged.
+    #
+    # The value is split on the encoded slash markers, each piece is decoded
+    # independently, and the pieces are rejoined with a canonical "%2F". This
+    # cannot collide with any decoded byte (such as a percent-encoded control
+    # character like "%01"), unlike a sentinel round-trip.
     def self.decode_segment(value : String) : String
-      raise Purl::Error.new("Invalid character in segment") if value.includes?(SLASH_SENTINEL)
-      protected_input = value.gsub(/%2[Ff]/, SLASH_SENTINEL)
-      decoded = URI.decode(protected_input)
-      decoded.gsub(SLASH_SENTINEL, "%2F")
+      value.split(/%2[Ff]/).map { |part| URI.decode(part) }.join("%2F")
     end
 
     # Percent-encode a purl component (namespace segment, name, version).
