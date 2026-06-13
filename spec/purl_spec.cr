@@ -787,6 +787,20 @@ describe Purl do
         p.namespace.should eq("a@b%2Fc")
         p.to_s.should eq("pkg:generic/a%40b%2Fc/d")
       end
+
+      # Regression: a percent-encoded control character (e.g. %01) decodes to a
+      # byte that previously matched the U+0001 sentinel used to protect %2F,
+      # which made an encoded control char collide with an encoded slash.
+      it "does not let a percent-encoded control char collide with %2F at the encoder level" do
+        Purl::Encoder.decode_segment("foo%01bar").should_not eq(Purl::Encoder.decode_segment("foo%2Fbar"))
+      end
+
+      it "parses an encoded control char and an encoded slash to distinct namespaces" do
+        a = Purl::PackageURL.parse("pkg:generic/foo%01bar/name")
+        b = Purl::PackageURL.parse("pkg:generic/foo%2Fbar/name")
+        a.namespace.should_not eq(b.namespace)
+        b.namespace.should eq("foo%2Fbar")
+      end
     end
 
     # =========================================================================
