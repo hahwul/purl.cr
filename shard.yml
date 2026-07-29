@@ -11,7 +11,7 @@ documentation: https://github.com/hahwul/purl.cr#readme
 authors:
   - HAHWUL <hahwul@gmail.com>
 
-crystal: '>= 1.17.0'
+crystal: ">= 1.21.0"
 
 license: MIT
 

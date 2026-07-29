@@ -6,7 +6,7 @@ weight = 1
 
 ## Prerequisites
 
-- [Crystal](https://crystal-lang.org/) >= 1.11.2
+- [Crystal](https://crystal-lang.org/) >= 1.21.0
 
 ## Installation
 
