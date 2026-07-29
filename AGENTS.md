@@ -4,7 +4,7 @@ This is a Crystal implementation of the [Package URL (purl) specification](https
 
 ## Project Overview
 
-- **Language**: Crystal (>= 1.11.2)
+- **Language**: Crystal (>= 1.21.0)
 - **License**: MIT
 - **Purpose**: A library to parse and generate Package URLs (purls)
 
