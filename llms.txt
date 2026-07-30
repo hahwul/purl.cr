@@ -1,0 +1,22 @@
+# purl.cr
+
+> Crystal implementation of the Package URL (purl) specification
+
+This is the documentation for purl.cr, a Crystal implementation of the Package URL (purl) specification (ECMA-427).
+
+## Pages
+
+- [purl.cr](https://purl.cr.hahwul.com/): Crystal implementation of the Package URL (purl) specification
+
+## API Reference
+
+- [Errors](https://purl.cr.hahwul.com/api-reference/errors/): Error handling in purl.cr
+- [PackageURL](https://purl.cr.hahwul.com/api-reference/package-url/): PackageURL class reference
+
+## User Guide
+
+- [Basic Usage](https://purl.cr.hahwul.com/user-guide/basic-usage/): Creating and manipulating Package URLs
+- [Getting Started](https://purl.cr.hahwul.com/user-guide/getting-started/): Installation and first steps with purl.cr
+- [Parsing](https://purl.cr.hahwul.com/user-guide/parsing/): Parsing Package URL strings
+- [Type Normalization](https://purl.cr.hahwul.com/user-guide/type-normalization/): Type-specific normalization rules
+
