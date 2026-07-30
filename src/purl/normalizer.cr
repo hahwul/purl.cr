@@ -8,7 +8,12 @@ module Purl
     ENCODED_SLASH = /%2[Ff]/
 
     def self.normalize_name(type : String, name : String) : String
-      around_encoded_slash(name) { |part| normalize_name_part(type, part) }
+      # A name is a single path segment, so a raw "/" in a caller-supplied
+      # name cannot be a separator — it can only be a slash living *inside*
+      # the segment, which is exactly what the "%2F" marker stands for.
+      # Converting it up front makes a constructed name match the one you get
+      # back from parsing that purl, since the serialized form is identical.
+      around_encoded_slash(name.gsub('/', "%2F")) { |part| normalize_name_part(type, part) }
     end
 
     def self.normalize_namespace(type : String, namespace : String) : String

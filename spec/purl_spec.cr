@@ -105,6 +105,22 @@ describe Purl do
         end
       end
 
+      it "represents a raw slash in a name as the %2F marker" do
+        p = Purl::PackageURL.new("generic", nil, "foo/bar")
+        p.name.should eq("foo%2Fbar")
+        p.to_s.should eq("pkg:generic/foo%2Fbar")
+      end
+
+      it "makes a constructed name with a slash equal to its parsed form" do
+        original = Purl::PackageURL.new("generic", nil, "foo/bar")
+        original.should eq(Purl::PackageURL.parse("pkg:generic/foo%2Fbar"))
+        (Purl::PackageURL.parse(original.to_s) == original).should be_true
+      end
+
+      it "applies type normalization around a slash in a name" do
+        Purl::PackageURL.new("pypi", nil, "My_A/My_B").name.should eq("my-a%2Fmy-b")
+      end
+
       it "preserves cpan distribution name case" do
         p = Purl::PackageURL.new("cpan", "DROLSKY", "DateTime")
         p.name.should eq("DateTime")
