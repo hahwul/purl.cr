@@ -3,9 +3,9 @@ require "uri"
 module Purl
   # Handles percent-encoding/decoding of purl components.
   module Encoder
-    # Characters that should NOT be percent-encoded in qualifier values (beyond unreserved chars)
-    # Per spec: qualifier values are percent-encoded strings, but `:` and `/` should not be encoded
-    QUALIFIER_VALUE_SAFE = ":/"
+    # Matches the "%2F" marker (in either case) that stands for a slash
+    # percent-encoded *inside* a single namespace or name segment.
+    ENCODED_SLASH = /%2[Ff]/
 
     # Decode a path segment of a purl while preserving %2F (and %2f) as a
     # literal "%2F" marker. The purl spec requires that an encoded slash
@@ -19,47 +19,56 @@ module Purl
     # cannot collide with any decoded byte (such as a percent-encoded control
     # character like "%01"), unlike a sentinel round-trip.
     def self.decode_segment(value : String) : String
-      value.split(/%2[Ff]/).map { |part| URI.decode(part) }.join("%2F")
+      value.split(ENCODED_SLASH).map { |part| URI.decode(part) }.join("%2F")
     end
 
-    # Percent-encode a purl component (namespace segment, name, version).
-    # Encodes all characters except unreserved characters (RFC 3986). Any
-    # embedded "%2F" markers are passed through verbatim so a slash that
-    # was encoded inside a segment stays encoded after round-tripping.
+    # Percent-encode a purl component (namespace segment, name). Any embedded
+    # "%2F" markers are passed through verbatim so a slash that was encoded
+    # inside a segment stays encoded after round-tripping.
     def self.encode_component(value : String) : String
-      return URI.encode_path_segment(value) unless value.includes?('%')
-
-      String.build do |io|
-        cursor = 0
-        i = 0
-        while i <= value.size - 3
-          if value[i]? == '%' && (h = value[i + 1]?) && (l = value[i + 2]?) &&
-             h == '2' && (l == 'F' || l == 'f')
-            io << URI.encode_path_segment(value[cursor...i]) if i > cursor
-            io << "%2F"
-            i += 3
-            cursor = i
-          else
-            i += 1
-          end
-        end
-        io << URI.encode_path_segment(value[cursor..]) if cursor < value.size
-      end
+      return encode_literal(value) unless value.matches?(ENCODED_SLASH)
+      value.split(ENCODED_SLASH).map { |part| encode_literal(part) }.join("%2F")
     end
 
-    # Encode qualifier value: similar to encode_component but preserves `:` and `/`
+    # Percent-encode a component that carries no "%2F" marker semantics:
+    # the version, and each individual subpath segment.
+    #
+    # Unlike namespace/name segments, these are fully decoded when parsed —
+    # they have no internal segment structure for an encoded slash to be
+    # confused with — so a `%` in them is always a literal percent sign.
+    # Encoding them with `encode_component` would pass a literal "%2F"
+    # through verbatim, and re-parsing would then decode it back into a
+    # slash, changing the value.
+    def self.encode_literal(value : String) : String
+      String.build { |io| percent_encode(value, io) }
+    end
+
+    # Qualifier values follow the same rule as every other component: the
+    # colon stays as-is, and a slash — which is never a separator inside a
+    # value — is encoded. So `repository_url=https://example.com` serializes
+    # as `repository_url=https:%2F%2Fexample.com`.
     def self.encode_qualifier_value(value : String) : String
-      String.build do |str|
-        value.each_char do |c|
-          if QUALIFIER_VALUE_SAFE.includes?(c)
-            str << c
-          elsif c.ascii_alphanumeric? || c == '-' || c == '.' || c == '_' || c == '~'
-            str << c
-          else
-            c.to_s.to_slice.each do |byte|
-              str << '%'
-              str << byte.to_s(16, upcase: true).rjust(2, '0')
-            end
+      encode_literal(value)
+    end
+
+    # ECMA-427 clause 5.4 lists what is left alone: the alphanumeric
+    # characters, the punctuation characters "-", ".", "_" and "~", and the
+    # colon ":", which "shall not be percent-encoded ... whether used as a
+    # Separator Character or otherwise". Everything else is encoded, including
+    # "/" wherever it is not acting as a purl separator.
+    private def self.safe_char?(char : Char) : Bool
+      char.ascii_alphanumeric? ||
+        char == '-' || char == '.' || char == '_' || char == '~' || char == ':'
+    end
+
+    private def self.percent_encode(value : String, io : IO) : Nil
+      value.each_char do |char|
+        if safe_char?(char)
+          io << char
+        else
+          char.each_byte do |byte|
+            io << '%'
+            io << byte.to_s(16, upcase: true).rjust(2, '0')
           end
         end
       end

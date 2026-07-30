@@ -14,10 +14,13 @@ module Purl
 
       # Step 1: Split off the subpath from the right side using `#`
       subpath : String? = nil
+      # The raw (still percent-encoded) subpath is handed to PackageURL, which
+      # decodes and normalizes it exactly once. Decoding it here as well would
+      # decode it twice: `#foo%252Fbar` would become "foo%2Fbar" and then
+      # "foo/bar", turning one literal segment into two.
       if idx = remainder.rindex('#')
-        subpath_raw = remainder[(idx + 1)..]
+        subpath = remainder[(idx + 1)..]
         remainder = remainder[...idx]
-        subpath = Normalizer.decode_and_normalize_subpath(subpath_raw)
       end
 
       # Step 2: Split off the qualifiers from the right side using `?`
@@ -47,10 +50,19 @@ module Purl
       type = remainder[...idx].downcase
       remainder = remainder[(idx + 1)..]
 
-      # Step 5: Split off version from right side using `@`
+      # Step 5: Split off version from right side using `@`.
+      #
+      # The version is a single opaque component, not a `/`-separated path, so
+      # an encoded slash carries no structural meaning there: `%2F` and a raw
+      # `/` denote the same character. It is therefore fully decoded (unlike
+      # namespace/name segments, where `%2F` must stay distinct from the
+      # segment separator). Decoding it as a segment would keep the literal
+      # "%2F" marker in the value and break round-tripping, because the
+      # encoder re-emits the marker verbatim: `pkg:npm/a@1/2` would parse to
+      # version "1/2", serialize to "1%2F2", and re-parse to "1%2F2".
       version : String? = nil
-      if idx = remainder.rindex('@')
-        version = Encoder.decode_segment(remainder[(idx + 1)..])
+      if idx = version_separator_index(remainder)
+        version = URI.decode(remainder[(idx + 1)..])
         remainder = remainder[...idx]
       end
 
@@ -75,6 +87,21 @@ module Purl
       PackageURL.new(type, namespace, name, version, qualifiers, subpath)
     end
 
+    # Locates the `@` that separates the version.
+    #
+    # The version always trails the name, so the separator can only live in
+    # the last path segment. Taking the rightmost `@` anywhere in the
+    # remainder misreads an unencoded npm scope — `pkg:npm/@babel/core` has to
+    # parse as namespace "@babel" / name "core", not as an empty name with the
+    # version "babel/core". Confining the search to the final segment also
+    # keeps genuinely nameless purls invalid, since `pkg:cran/@0.9.1` still
+    # splits into an empty name and the version "0.9.1".
+    private def self.version_separator_index(remainder : String) : Int32?
+      segment_start = (slash = remainder.rindex('/')) ? slash + 1 : 0
+      idx = remainder.rindex('@')
+      idx && idx >= segment_start ? idx : nil
+    end
+
     # Parses qualifier query string into a hash of key-value pairs.
     def self.parse_qualifiers(raw : String) : Hash(String, String)?
       return if raw.strip.empty?
@@ -90,8 +117,14 @@ module Purl
         unless QUALIFIER_KEY_PATTERN.matches?(key)
           raise Purl::Error.new("Invalid qualifier key '#{key}': must start with a letter and contain only lowercase ASCII letters, digits, '.', '_' or '-'")
         end
-        decoded_value = URI.decode(value)
-        result[key] = decoded_value
+        # ECMA-427: "Each key shall be unique among all the keys of the
+        # qualifiers component." Silently keeping the last occurrence would
+        # discard data from an invalid purl without telling the caller —
+        # `?arch=amd64&arch=i386` would resolve to a single arch.
+        if result.has_key?(key)
+          raise Purl::Error.new("Duplicate qualifier key '#{key}': each key must appear at most once")
+        end
+        result[key] = URI.decode(value)
       end
       result.empty? ? nil : result
     end

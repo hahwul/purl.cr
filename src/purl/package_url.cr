@@ -24,8 +24,20 @@ module Purl
     getter namespace : String?
     getter name : String
     getter version : String?
-    getter qualifiers : Hash(String, String)?
     getter subpath : String?
+
+    @qualifiers : Hash(String, String)?
+
+    # The normalized qualifiers, or nil when there are none.
+    #
+    # Returns a copy. A PackageURL is a value object whose `==` and `#hash`
+    # are derived from its qualifiers, so handing out the internal hash would
+    # let a caller mutate a purl that is already in use as a Hash key and
+    # quietly break every lookup for it. Build a new PackageURL from a
+    # modified copy instead of mutating this one.
+    def qualifiers : Hash(String, String)?
+      @qualifiers.try(&.dup)
+    end
 
     def initialize(
       type : String,
@@ -48,9 +60,19 @@ module Purl
       if ns && ns.strip.empty?
         ns = nil
       end
+
+      # A blank version carries no information and is not part of the
+      # canonical form: `pkg:npm/foo@` and `pkg:npm/foo` denote the same
+      # package, so an empty (or whitespace-only) version collapses to nil
+      # rather than being serialized back as a dangling `@`.
+      ver = version
+      if ver && ver.strip.empty?
+        ver = nil
+      end
+
       @namespace = ns ? normalize_optional_namespace(@type, ns) : nil
       @name = Normalizer.normalize_name(@type, name)
-      @version = version ? Normalizer.normalize_version(@type, version) : nil
+      @version = ver ? Normalizer.normalize_version(@type, ver) : nil
       @qualifiers = normalize_qualifiers(qualifiers)
       @subpath = subpath ? Normalizer.normalize_subpath(subpath) : nil
     end
@@ -77,7 +99,7 @@ module Purl
       io << "/" << Encoder.encode_component(@name)
 
       if ver = @version
-        io << "@" << Encoder.encode_component(ver)
+        io << "@" << Encoder.encode_literal(ver)
       end
 
       if quals = @qualifiers
@@ -92,18 +114,20 @@ module Purl
         io << "#"
         sub.split("/").each_with_index do |seg, i|
           io << "/" if i > 0
-          io << Encoder.encode_component(seg)
+          io << Encoder.encode_literal(seg)
         end
       end
     end
 
     # Equality comparison: two PackageURLs are equal if all normalized components match.
+    # Compares the qualifiers directly rather than through the getter, which
+    # copies.
     def ==(other : PackageURL) : Bool
       @type == other.type &&
         @namespace == other.namespace &&
         @name == other.name &&
         @version == other.version &&
-        @qualifiers == other.qualifiers &&
+        @qualifiers == other.@qualifiers &&
         @subpath == other.subpath
     end
 
@@ -138,6 +162,12 @@ module Purl
         next if value.strip.empty?
         unless QUALIFIER_KEY_PATTERN.matches?(k)
           raise Purl::Error.new("Invalid qualifier key '#{k}': must start with a letter and contain only lowercase ASCII letters, digits, '.', '_' or '-'")
+        end
+        # Keys are compared after downcasing, so distinct keys in the input
+        # hash can collide here (e.g. "Arch" and "arch"). Report that rather
+        # than letting one value silently overwrite the other.
+        if normalized.has_key?(k)
+          raise Purl::Error.new("Duplicate qualifier key '#{k}': each key must appear at most once")
         end
         normalized[k] = value
       end
