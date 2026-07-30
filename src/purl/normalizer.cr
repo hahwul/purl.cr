@@ -3,7 +3,36 @@ require "uri"
 module Purl
   # Handles type-specific normalization of purl components.
   module Normalizer
+    # Matches the literal "%2F" marker that stands in for an encoded slash
+    # inside a decoded namespace or name segment (see `Encoder.decode_segment`).
+    ENCODED_SLASH = /%2[Ff]/
+
     def self.normalize_name(type : String, name : String) : String
+      around_encoded_slash(name) { |part| normalize_name_part(type, part) }
+    end
+
+    def self.normalize_namespace(type : String, namespace : String) : String
+      normalized = around_encoded_slash(namespace) { |part| normalize_namespace_part(type, part) }
+      # The canonical purl form must not contain empty path segments, so a
+      # namespace like "a//b" collapses to "a/b". This keeps a constructed
+      # purl identical to its parsed form.
+      normalized.split("/").reject(&.empty?).join("/")
+    end
+
+    # Apply a normalization rule to a namespace/name value without letting it
+    # touch any embedded "%2F" marker. The marker is not part of the package
+    # identity's text — it stands for a slash that was percent-encoded inside
+    # a single segment — so rules must not see it: `downcase` would rewrite it
+    # to a non-canonical "%2f", and pub's `[^a-z0-9_]` substitution would
+    # mangle it into "_2f", silently changing which package the purl names.
+    # Each chunk between markers is normalized separately and the pieces are
+    # rejoined with the canonical "%2F".
+    private def self.around_encoded_slash(value : String, & : String -> String) : String
+      return yield value unless value.matches?(ENCODED_SLASH)
+      value.split(ENCODED_SLASH).map { |part| yield part }.join("%2F")
+    end
+
+    private def self.normalize_name_part(type : String, name : String) : String
       case type
       when "pypi"
         name.gsub('_', '-').downcase
@@ -17,18 +46,13 @@ module Purl
       end
     end
 
-    def self.normalize_namespace(type : String, namespace : String) : String
-      normalized =
-        case type
-        when "npm", "golang", "deb", "rpm", "github", "bitbucket", "composer"
-          namespace.downcase
-        else
-          namespace
-        end
-      # The canonical purl form must not contain empty path segments, so a
-      # namespace like "a//b" collapses to "a/b". This keeps a constructed
-      # purl identical to its parsed form.
-      normalized.split("/").reject(&.empty?).join("/")
+    private def self.normalize_namespace_part(type : String, namespace : String) : String
+      case type
+      when "npm", "golang", "deb", "rpm", "github", "bitbucket", "composer"
+        namespace.downcase
+      else
+        namespace
+      end
     end
 
     # Normalize a type-specific version. Most types store the version

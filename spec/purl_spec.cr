@@ -832,6 +832,35 @@ describe Purl do
     # %2F preservation in segments (security: SBOM matching collisions)
     # =========================================================================
     describe "%2F preservation" do
+      # Type-specific normalization must not reach into the marker itself.
+      it "keeps the %2F marker canonical when the type lowercases names" do
+        p = Purl::PackageURL.parse("pkg:npm/Foo%2FBar")
+        p.name.should eq("foo%2Fbar")
+        p.to_s.should eq("pkg:npm/foo%2Fbar")
+      end
+
+      it "keeps the %2F marker canonical when the type lowercases namespaces" do
+        p = Purl::PackageURL.parse("pkg:npm/A%2FB/c")
+        p.namespace.should eq("a%2Fb")
+        p.to_s.should eq("pkg:npm/a%2Fb/c")
+      end
+
+      it "does not let pub name normalization rewrite the %2F marker" do
+        p = Purl::PackageURL.parse("pkg:pub/Foo%2FBar")
+        p.name.should eq("foo%2Fbar")
+        p.to_s.should eq("pkg:pub/foo%2Fbar")
+      end
+
+      it "does not let pypi name normalization rewrite the %2F marker" do
+        p = Purl::PackageURL.parse("pkg:pypi/Foo_A%2FBar_B")
+        p.name.should eq("foo-a%2Fbar-b")
+      end
+
+      it "still distinguishes an encoded slash from a real one after normalization" do
+        Purl::PackageURL.parse("pkg:pub/foo%2Fbar")
+          .should_not eq(Purl::PackageURL.parse("pkg:pub/foo/bar"))
+      end
+
       it "preserves %2F inside a namespace segment so it is not conflated with the path separator" do
         a = Purl::PackageURL.parse("pkg:generic/foo%2Fbar/baz")
         b = Purl::PackageURL.parse("pkg:generic/foo/bar/baz")
