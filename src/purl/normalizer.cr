@@ -32,6 +32,20 @@ module Purl
       value.split(ENCODED_SLASH).map { |part| yield part }.join("%2F")
     end
 
+    # Types whose name is declared case-insensitive and must be lowercased.
+    LOWERCASE_NAME_TYPES = %w[
+      alpm apk bitbucket bitnami composer deb github golang hex luarocks npm oci
+    ]
+
+    # Types whose namespace is declared case-insensitive and must be lowercased.
+    LOWERCASE_NAMESPACE_TYPES = %w[
+      alpm apk bitbucket composer deb github golang hex luarocks npm qpkg rpm
+    ]
+
+    # Types whose namespace must be uppercased. `cpan` namespaces are CPAN
+    # author IDs (CPANIDs), which the spec requires in uppercase.
+    UPCASE_NAMESPACE_TYPES = %w[cpan]
+
     private def self.normalize_name_part(type : String, name : String) : String
       case type
       when "pypi"
@@ -39,7 +53,7 @@ module Purl
       when "pub"
         # pub names are lowercased and any char outside [a-z0-9_] becomes '_'.
         name.downcase.gsub(/[^a-z0-9_]/, '_')
-      when "npm", "golang", "deb", "github", "bitbucket", "composer", "oci"
+      when .in?(LOWERCASE_NAME_TYPES)
         name.downcase
       else
         name
@@ -48,8 +62,10 @@ module Purl
 
     private def self.normalize_namespace_part(type : String, namespace : String) : String
       case type
-      when "npm", "golang", "deb", "rpm", "github", "bitbucket", "composer"
+      when .in?(LOWERCASE_NAMESPACE_TYPES)
         namespace.downcase
+      when .in?(UPCASE_NAMESPACE_TYPES)
+        namespace.upcase
       else
         namespace
       end

@@ -97,6 +97,23 @@ describe Purl do
         p.name.should eq("mypackage")
       end
 
+      # Types whose definition declares the name case-insensitive.
+      {"hex" => "Jason", "apk" => "Curl", "alpm" => "PacMan",
+       "bitnami" => "WordPress", "luarocks" => "LUA-resty-http"}.each do |type, raw|
+        it "normalizes #{type} name to lowercase" do
+          Purl::PackageURL.new(type, nil, raw).name.should eq(raw.downcase)
+        end
+      end
+
+      it "preserves cpan distribution name case" do
+        p = Purl::PackageURL.new("cpan", "DROLSKY", "DateTime")
+        p.name.should eq("DateTime")
+      end
+
+      it "preserves cran name case" do
+        Purl::PackageURL.new("cran", nil, "A3").name.should eq("A3")
+      end
+
       it "normalizes golang name to lowercase" do
         p = Purl::PackageURL.new("golang", "github.com/Package", "MyLib")
         p.name.should eq("mylib")
@@ -185,6 +202,20 @@ describe Purl do
       it "normalizes bitbucket namespace to lowercase" do
         p = Purl::PackageURL.new("bitbucket", "MyOrg", "repo")
         p.namespace.should eq("myorg")
+      end
+
+      # Types whose definition declares the namespace case-insensitive.
+      {"hex" => "BitwiseOps", "apk" => "Alpine", "alpm" => "Arch",
+       "luarocks" => "Kong", "qpkg" => "Blackberry"}.each do |type, raw|
+        it "normalizes #{type} namespace to lowercase" do
+          Purl::PackageURL.new(type, raw, "pkg").namespace.should eq(raw.downcase)
+        end
+      end
+
+      it "uppercases the cpan namespace (CPANID)" do
+        p = Purl::PackageURL.new("cpan", "drolsky", "DateTime")
+        p.namespace.should eq("DROLSKY")
+        p.to_s.should eq("pkg:cpan/DROLSKY/DateTime")
       end
 
       it "preserves maven namespace case" do
