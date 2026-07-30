@@ -47,15 +47,16 @@ module Purl
       end
     end
 
-    # Percent-encode a single subpath segment.
+    # Percent-encode a component that carries no "%2F" marker semantics:
+    # the version, and each individual subpath segment.
     #
-    # Unlike namespace/name segments, a subpath is fully decoded and re-split
-    # on `/` when it is parsed, so no "%2F" marker survives normalization and
-    # a `%` in a segment is always a literal percent sign. Encoding it with
-    # `encode_component` would pass a literal "%2F" through verbatim, and
-    # re-parsing would then decode it into a segment separator — splitting one
-    # segment into two.
-    def self.encode_subpath_segment(value : String) : String
+    # Unlike namespace/name segments, these are fully decoded when parsed —
+    # they have no internal segment structure for an encoded slash to be
+    # confused with — so a `%` in them is always a literal percent sign.
+    # Encoding them with `encode_component` would pass a literal "%2F"
+    # through verbatim, and re-parsing would then decode it back into a
+    # slash, changing the value.
+    def self.encode_literal(value : String) : String
       URI.encode_path_segment(value)
     end
 

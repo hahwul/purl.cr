@@ -87,7 +87,7 @@ module Purl
       io << "/" << Encoder.encode_component(@name)
 
       if ver = @version
-        io << "@" << Encoder.encode_component(ver)
+        io << "@" << Encoder.encode_literal(ver)
       end
 
       if quals = @qualifiers
@@ -102,7 +102,7 @@ module Purl
         io << "#"
         sub.split("/").each_with_index do |seg, i|
           io << "/" if i > 0
-          io << Encoder.encode_subpath_segment(seg)
+          io << Encoder.encode_literal(seg)
         end
       end
     end

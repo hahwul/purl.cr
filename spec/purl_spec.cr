@@ -302,6 +302,19 @@ describe Purl do
         (Purl::PackageURL.parse(p.to_s) == p).should be_true
       end
 
+      it "round-trips a version containing a literal percent sign" do
+        original = Purl::PackageURL.new("generic", nil, "pkg", "100%")
+        original.to_s.should eq("pkg:generic/pkg@100%25")
+        (Purl::PackageURL.parse(original.to_s) == original).should be_true
+      end
+
+      it "round-trips a version whose text contains a literal %2F" do
+        original = Purl::PackageURL.new("generic", nil, "pkg", "a%2Fb")
+        original.version.should eq("a%2Fb")
+        original.to_s.should eq("pkg:generic/pkg@a%252Fb")
+        (Purl::PackageURL.parse(original.to_s) == original).should be_true
+      end
+
       it "treats an empty version as no version" do
         p = Purl::PackageURL.parse("pkg:npm/foo@")
         p.version.should be_nil
