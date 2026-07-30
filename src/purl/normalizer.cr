@@ -56,10 +56,6 @@ module Purl
       normalize_subpath_segments(decode_subpath_segments(subpath))
     end
 
-    def self.decode_and_normalize_subpath(raw : String) : String?
-      normalize_subpath_segments(decode_subpath_segments(raw))
-    end
-
     private def self.decode_subpath_segments(raw : String) : Array(String)
       raw.split("/").flat_map { |seg| URI.decode(seg).split("/") }
     end

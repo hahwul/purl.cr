@@ -102,7 +102,7 @@ module Purl
         io << "#"
         sub.split("/").each_with_index do |seg, i|
           io << "/" if i > 0
-          io << Encoder.encode_component(seg)
+          io << Encoder.encode_subpath_segment(seg)
         end
       end
     end

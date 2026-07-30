@@ -14,10 +14,13 @@ module Purl
 
       # Step 1: Split off the subpath from the right side using `#`
       subpath : String? = nil
+      # The raw (still percent-encoded) subpath is handed to PackageURL, which
+      # decodes and normalizes it exactly once. Decoding it here as well would
+      # decode it twice: `#foo%252Fbar` would become "foo%2Fbar" and then
+      # "foo/bar", turning one literal segment into two.
       if idx = remainder.rindex('#')
-        subpath_raw = remainder[(idx + 1)..]
+        subpath = remainder[(idx + 1)..]
         remainder = remainder[...idx]
-        subpath = Normalizer.decode_and_normalize_subpath(subpath_raw)
       end
 
       # Step 2: Split off the qualifiers from the right side using `?`

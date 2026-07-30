@@ -349,6 +349,30 @@ describe Purl do
         p.subpath.should eq("src/lib/main")
       end
 
+      it "decodes a parsed subpath exactly once" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg#foo%252Fbar")
+        p.subpath.should eq("foo%2Fbar")
+      end
+
+      it "round-trips a subpath segment containing a literal percent sign" do
+        original = Purl::PackageURL.new("npm", nil, "pkg", subpath: "100%")
+        original.subpath.should eq("100%")
+        original.to_s.should eq("pkg:npm/pkg#100%25")
+        (Purl::PackageURL.parse(original.to_s) == original).should be_true
+      end
+
+      it "round-trips a subpath whose segment contains a literal %2F" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg#foo%252Fbar")
+        p.to_s.should eq("pkg:npm/pkg#foo%252Fbar")
+        (Purl::PackageURL.parse(p.to_s) == p).should be_true
+      end
+
+      it "splits an encoded slash in a subpath into separate segments" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg#foo%2Fbar")
+        p.subpath.should eq("foo/bar")
+        p.to_s.should eq("pkg:npm/pkg#foo/bar")
+      end
+
       it "drops whitespace-only subpath segments" do
         p = Purl::PackageURL.parse("pkg:npm/pkg#src/%20/main")
         p.subpath.should eq("src/main")
