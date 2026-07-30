@@ -102,8 +102,14 @@ module Purl
         unless QUALIFIER_KEY_PATTERN.matches?(key)
           raise Purl::Error.new("Invalid qualifier key '#{key}': must start with a letter and contain only lowercase ASCII letters, digits, '.', '_' or '-'")
         end
-        decoded_value = URI.decode(value)
-        result[key] = decoded_value
+        # ECMA-427: "Each key shall be unique among all the keys of the
+        # qualifiers component." Silently keeping the last occurrence would
+        # discard data from an invalid purl without telling the caller —
+        # `?arch=amd64&arch=i386` would resolve to a single arch.
+        if result.has_key?(key)
+          raise Purl::Error.new("Duplicate qualifier key '#{key}': each key must appear at most once")
+        end
+        result[key] = URI.decode(value)
       end
       result.empty? ? nil : result
     end

@@ -374,6 +374,40 @@ describe Purl do
     # Qualifiers (Hash-based)
     # =========================================================================
     describe "qualifiers" do
+      # ECMA-427: "Each key shall be unique among all the keys of the
+      # qualifiers component."
+      it "rejects a duplicate qualifier key when parsing" do
+        expect_raises(Purl::Error, /Duplicate qualifier key 'arch'/) do
+          Purl::PackageURL.parse("pkg:deb/debian/curl@1?arch=amd64&arch=i386")
+        end
+      end
+
+      it "rejects keys that collide only after downcasing" do
+        expect_raises(Purl::Error, /Duplicate qualifier key 'arch'/) do
+          Purl::PackageURL.new("npm", nil, "pkg", nil, {"Arch" => "amd64", "arch" => "i386"})
+        end
+      end
+
+      it "does not treat a skipped empty value as a duplicate" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg?arch=&arch=x86")
+        p.qualifiers.should eq({"arch" => "x86"})
+      end
+
+      it "does not expose its internal qualifier hash" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg?arch=x86")
+        p.qualifiers.not_nil!["arch"] = "tampered"
+        p.qualifiers.should eq({"arch" => "x86"})
+        p.to_s.should eq("pkg:npm/pkg?arch=x86")
+      end
+
+      it "keeps equality and hash stable when a returned qualifier hash is mutated" do
+        key = Purl::PackageURL.parse("pkg:npm/pkg?arch=x86")
+        lookup = {key => :found}
+        key.qualifiers.not_nil!["arch"] = "tampered"
+        lookup[key]?.should eq(:found)
+        key.should eq(Purl::PackageURL.parse("pkg:npm/pkg?arch=x86"))
+      end
+
       it "stores qualifiers as Hash(String, String)" do
         p = Purl::PackageURL.new("npm", nil, "pkg", nil, {"repository_url" => "https://example.com"})
         p.qualifiers.should eq({"repository_url" => "https://example.com"})
