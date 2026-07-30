@@ -14,9 +14,11 @@ module Purl
     def self.normalize_namespace(type : String, namespace : String) : String
       normalized = around_encoded_slash(namespace) { |part| normalize_namespace_part(type, part) }
       # The canonical purl form must not contain empty path segments, so a
-      # namespace like "a//b" collapses to "a/b". This keeps a constructed
-      # purl identical to its parsed form.
-      normalized.split("/").reject(&.empty?).join("/")
+      # namespace like "a//b" collapses to "a/b". Blank segments go the same
+      # way: the parser discards a namespace that is only whitespace, so
+      # keeping " " here would make a constructed purl differ from its own
+      # parsed form (`pkg:npm/%20/pkg` parses back with no namespace at all).
+      normalized.split("/").reject(&.strip.empty?).join("/")
     end
 
     # Apply a normalization rule to a namespace/name value without letting it

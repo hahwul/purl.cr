@@ -218,6 +218,22 @@ describe Purl do
         p.to_s.should eq("pkg:cpan/DROLSKY/DateTime")
       end
 
+      it "drops blank namespace segments" do
+        p = Purl::PackageURL.new("generic", "a/ /b", "pkg")
+        p.namespace.should eq("a/b")
+      end
+
+      it "collapses a namespace of only whitespace to nil" do
+        p = Purl::PackageURL.new("generic", " / ", "pkg")
+        p.namespace.should be_nil
+        p.to_s.should eq("pkg:generic/pkg")
+      end
+
+      it "round-trips a namespace that contains a blank segment" do
+        original = Purl::PackageURL.new("generic", " /a", "pkg")
+        (Purl::PackageURL.parse(original.to_s) == original).should be_true
+      end
+
       it "preserves maven namespace case" do
         p = Purl::PackageURL.new("maven", "org.Apache.Commons", "lang3")
         p.namespace.should eq("org.Apache.Commons")
