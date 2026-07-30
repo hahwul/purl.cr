@@ -271,6 +271,22 @@ describe Purl do
         (Purl::PackageURL.parse(p.to_s) == p).should be_true
       end
 
+      it "treats an empty version as no version" do
+        p = Purl::PackageURL.parse("pkg:npm/foo@")
+        p.version.should be_nil
+        p.to_s.should eq("pkg:npm/foo")
+      end
+
+      it "treats a whitespace-only version as no version" do
+        p = Purl::PackageURL.new("npm", nil, "foo", "   ")
+        p.version.should be_nil
+        p.to_s.should eq("pkg:npm/foo")
+      end
+
+      it "considers a blank version equal to an absent one" do
+        Purl::PackageURL.parse("pkg:npm/foo@").should eq(Purl::PackageURL.parse("pkg:npm/foo"))
+      end
+
       it "round-trips a constructed version containing a slash" do
         original = Purl::PackageURL.new("generic", nil, "pkg", "refs/heads/main")
         original.to_s.should eq("pkg:generic/pkg@refs%2Fheads%2Fmain")
@@ -331,6 +347,15 @@ describe Purl do
       it "removes dot-dot segments" do
         p = Purl::PackageURL.new("npm", nil, "pkg", nil, nil, "src/../lib/main")
         p.subpath.should eq("src/lib/main")
+      end
+
+      it "drops whitespace-only subpath segments" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg#src/%20/main")
+        p.subpath.should eq("src/main")
+      end
+
+      it "returns nil for a whitespace-only subpath" do
+        Purl::PackageURL.new("npm", nil, "pkg", subpath: "  ").subpath.should be_nil
       end
 
       it "returns nil for subpath that normalizes to empty" do

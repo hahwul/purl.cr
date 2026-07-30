@@ -65,7 +65,10 @@ module Purl
     end
 
     def self.normalize_subpath_segments(segments : Array(String)) : String?
-      cleaned = segments.reject { |s| s.empty? || s == "." || s == ".." }
+      # Blank segments are dropped alongside genuinely empty ones: a
+      # whitespace-only segment is not a meaningful path component and
+      # keeping it would serialize as `%20`, which no canonical purl uses.
+      cleaned = segments.reject { |s| s.strip.empty? || s == "." || s == ".." }
       return if cleaned.empty?
       cleaned.join("/")
     end

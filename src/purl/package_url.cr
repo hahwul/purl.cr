@@ -48,9 +48,19 @@ module Purl
       if ns && ns.strip.empty?
         ns = nil
       end
+
+      # A blank version carries no information and is not part of the
+      # canonical form: `pkg:npm/foo@` and `pkg:npm/foo` denote the same
+      # package, so an empty (or whitespace-only) version collapses to nil
+      # rather than being serialized back as a dangling `@`.
+      ver = version
+      if ver && ver.strip.empty?
+        ver = nil
+      end
+
       @namespace = ns ? normalize_optional_namespace(@type, ns) : nil
       @name = Normalizer.normalize_name(@type, name)
-      @version = version ? Normalizer.normalize_version(@type, version) : nil
+      @version = ver ? Normalizer.normalize_version(@type, ver) : nil
       @qualifiers = normalize_qualifiers(qualifiers)
       @subpath = subpath ? Normalizer.normalize_subpath(subpath) : nil
     end
