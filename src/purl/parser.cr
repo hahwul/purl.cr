@@ -61,7 +61,7 @@ module Purl
       # encoder re-emits the marker verbatim: `pkg:npm/a@1/2` would parse to
       # version "1/2", serialize to "1%2F2", and re-parse to "1%2F2".
       version : String? = nil
-      if idx = remainder.rindex('@')
+      if idx = version_separator_index(remainder)
         version = URI.decode(remainder[(idx + 1)..])
         remainder = remainder[...idx]
       end
@@ -85,6 +85,21 @@ module Purl
       raise Purl::Error.new("Invalid Package URL: name must not be empty") if name.strip.empty?
 
       PackageURL.new(type, namespace, name, version, qualifiers, subpath)
+    end
+
+    # Locates the `@` that separates the version.
+    #
+    # The version always trails the name, so the separator can only live in
+    # the last path segment. Taking the rightmost `@` anywhere in the
+    # remainder misreads an unencoded npm scope — `pkg:npm/@babel/core` has to
+    # parse as namespace "@babel" / name "core", not as an empty name with the
+    # version "babel/core". Confining the search to the final segment also
+    # keeps genuinely nameless purls invalid, since `pkg:cran/@0.9.1` still
+    # splits into an empty name and the version "0.9.1".
+    private def self.version_separator_index(remainder : String) : Int32?
+      segment_start = (slash = remainder.rindex('/')) ? slash + 1 : 0
+      idx = remainder.rindex('@')
+      idx && idx >= segment_start ? idx : nil
     end
 
     # Parses qualifier query string into a hash of key-value pairs.

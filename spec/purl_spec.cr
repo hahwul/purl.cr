@@ -327,11 +327,13 @@ describe Purl do
         p.version.should eq("1/2")
       end
 
-      it "round-trips a version containing an unencoded slash" do
+      # An unencoded slash after the `@` is malformed input: the slash binds
+      # as a path separator, so the `@` is not a version separator at all.
+      it "does not read a version across a path separator" do
         p = Purl::PackageURL.parse("pkg:npm/pkg@1/2")
-        p.version.should eq("1/2")
-        p.to_s.should eq("pkg:npm/pkg@1%2F2")
-        (Purl::PackageURL.parse(p.to_s) == p).should be_true
+        p.version.should be_nil
+        p.namespace.should eq("pkg@1")
+        p.name.should eq("2")
       end
 
       it "round-trips a version containing a literal percent sign" do
@@ -510,7 +512,7 @@ describe Purl do
       it "returns purl with all components" do
         quals = {"repository_url" => "https://example.com"}
         p = Purl::PackageURL.new("npm", "@angular", "animation", "12.3.1", quals, "src/main")
-        p.to_s.should eq("pkg:npm/%40angular/animation@12.3.1?repository_url=https://example.com#src/main")
+        p.to_s.should eq("pkg:npm/%40angular/animation@12.3.1?repository_url=https:%2F%2Fexample.com#src/main")
       end
 
       it "returns purl without namespace" do
@@ -562,6 +564,35 @@ describe Purl do
     # .parse
     # =========================================================================
     describe ".parse" do
+      # The version separator can only live in the last path segment, so an
+      # unencoded npm scope is a namespace rather than a version marker.
+      it "parses an unencoded npm scope as a namespace" do
+        p = Purl::PackageURL.parse("pkg:npm/@babel/core")
+        p.namespace.should eq("@babel")
+        p.name.should eq("core")
+        p.version.should be_nil
+        p.to_s.should eq("pkg:npm/%40babel/core")
+      end
+
+      it "parses an unencoded npm scope alongside a version" do
+        p = Purl::PackageURL.parse("pkg:npm/@babel/core@7.20.0")
+        p.namespace.should eq("@babel")
+        p.name.should eq("core")
+        p.version.should eq("7.20.0")
+      end
+
+      it "still rejects a purl whose only segment is a version" do
+        expect_raises(Purl::Error, /name must not be empty/) do
+          Purl::PackageURL.parse("pkg:cran/@0.9.1")
+        end
+      end
+
+      it "still rejects a trailing empty name before a version" do
+        expect_raises(Purl::Error, /name must not be empty/) do
+          Purl::PackageURL.parse("pkg:swift/github.com/Alamofire/@5.4.3")
+        end
+      end
+
       it "parses a purl with all components" do
         p = Purl::PackageURL.parse("pkg:npm/%40angular/animation@12.3.1?repository_url=https://example.com#src/main")
         p.type.should eq("npm")
@@ -941,6 +972,45 @@ describe Purl do
     # =========================================================================
     # %2F preservation in segments (security: SBOM matching collisions)
     # =========================================================================
+    # =========================================================================
+    # Percent-encoding rules (ECMA-427 clause 5.4)
+    # =========================================================================
+    describe "percent-encoding" do
+      # "the colon ':' ... shall not be percent-encoded, whether used as a
+      # Separator Character or otherwise"
+      it "never encodes a colon in the version" do
+        Purl::PackageURL.new("oci", nil, "debian", "sha256:244fd47e07d10")
+          .to_s.should eq("pkg:oci/debian@sha256:244fd47e07d10")
+      end
+
+      it "never encodes a colon in a deb epoch version" do
+        Purl::PackageURL.new("deb", "debian", "attr", "1:2.4.47-2")
+          .to_s.should eq("pkg:deb/debian/attr@1:2.4.47-2")
+      end
+
+      it "never encodes a colon in a name or subpath" do
+        p = Purl::PackageURL.new("generic", "a:b", "c:d", nil, nil, "e:f")
+        p.to_s.should eq("pkg:generic/a:b/c:d#e:f")
+      end
+
+      it "keeps the colon but encodes the slashes in a qualifier value" do
+        p = Purl::PackageURL.new("hex", nil, "bar", "1.2.3",
+          {"repository_url" => "https://myrepo.example.com"})
+        p.to_s.should eq("pkg:hex/bar@1.2.3?repository_url=https:%2F%2Fmyrepo.example.com")
+      end
+
+      it "round-trips a qualifier value containing slashes" do
+        original = Purl::PackageURL.new("oci", nil, "debian", nil,
+          {"repository_url" => "docker.io/library/debian"})
+        (Purl::PackageURL.parse(original.to_s) == original).should be_true
+      end
+
+      it "still encodes other reserved characters" do
+        Purl::PackageURL.new("npm", nil, "pkg", "1.0.0+build")
+          .to_s.should eq("pkg:npm/pkg@1.0.0%2Bbuild")
+      end
+    end
+
     describe "%2F preservation" do
       # Type-specific normalization must not reach into the marker itself.
       it "keeps the %2F marker canonical when the type lowercases names" do

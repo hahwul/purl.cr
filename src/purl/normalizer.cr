@@ -3,10 +3,6 @@ require "uri"
 module Purl
   # Handles type-specific normalization of purl components.
   module Normalizer
-    # Matches the literal "%2F" marker that stands in for an encoded slash
-    # inside a decoded namespace or name segment (see `Encoder.decode_segment`).
-    ENCODED_SLASH = /%2[Ff]/
-
     def self.normalize_name(type : String, name : String) : String
       # A name is a single path segment, so a raw "/" in a caller-supplied
       # name cannot be a separator — it can only be a slash living *inside*
@@ -35,8 +31,8 @@ module Purl
     # Each chunk between markers is normalized separately and the pieces are
     # rejoined with the canonical "%2F".
     private def self.around_encoded_slash(value : String, & : String -> String) : String
-      return yield value unless value.matches?(ENCODED_SLASH)
-      value.split(ENCODED_SLASH).map { |part| yield part }.join("%2F")
+      return yield value unless value.matches?(Encoder::ENCODED_SLASH)
+      value.split(Encoder::ENCODED_SLASH).map { |part| yield part }.join("%2F")
     end
 
     # Types whose name is declared case-insensitive and must be lowercased.
