@@ -255,6 +255,27 @@ describe Purl do
         p = Purl::PackageURL.new("npm", nil, "pkg", "1.0.0-RC1")
         p.version.should eq("1.0.0-RC1")
       end
+
+      # The version is a single opaque component, so `%2F` and `/` mean the
+      # same character there — unlike namespace/name segments, where the
+      # encoded slash must stay distinct from the segment separator.
+      it "decodes an encoded slash in the version to a literal slash" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg@1%2F2")
+        p.version.should eq("1/2")
+      end
+
+      it "round-trips a version containing an unencoded slash" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg@1/2")
+        p.version.should eq("1/2")
+        p.to_s.should eq("pkg:npm/pkg@1%2F2")
+        (Purl::PackageURL.parse(p.to_s) == p).should be_true
+      end
+
+      it "round-trips a constructed version containing a slash" do
+        original = Purl::PackageURL.new("generic", nil, "pkg", "refs/heads/main")
+        original.to_s.should eq("pkg:generic/pkg@refs%2Fheads%2Fmain")
+        (Purl::PackageURL.parse(original.to_s) == original).should be_true
+      end
     end
 
     # =========================================================================

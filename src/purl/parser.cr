@@ -47,10 +47,19 @@ module Purl
       type = remainder[...idx].downcase
       remainder = remainder[(idx + 1)..]
 
-      # Step 5: Split off version from right side using `@`
+      # Step 5: Split off version from right side using `@`.
+      #
+      # The version is a single opaque component, not a `/`-separated path, so
+      # an encoded slash carries no structural meaning there: `%2F` and a raw
+      # `/` denote the same character. It is therefore fully decoded (unlike
+      # namespace/name segments, where `%2F` must stay distinct from the
+      # segment separator). Decoding it as a segment would keep the literal
+      # "%2F" marker in the value and break round-tripping, because the
+      # encoder re-emits the marker verbatim: `pkg:npm/a@1/2` would parse to
+      # version "1/2", serialize to "1%2F2", and re-parse to "1%2F2".
       version : String? = nil
       if idx = remainder.rindex('@')
-        version = Encoder.decode_segment(remainder[(idx + 1)..])
+        version = URI.decode(remainder[(idx + 1)..])
         remainder = remainder[...idx]
       end
 
