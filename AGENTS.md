@@ -19,10 +19,20 @@ This is a Crystal implementation of the [Package URL (purl) specification](https
 ## Project Structure
 
 ```
-src/           # Source code
-  purl.cr      # Main module and PackageURL class
-spec/          # Test specifications
-  purl_spec.cr # Tests for Purl module
+src/
+  purl.cr               # Entry point: requires everything below
+  purl/
+    package_url.cr      # PackageURL value object: build, validate, to_s
+    parser.cr           # Parses a purl string into components
+    normalizer.cr       # Type-specific component normalization
+    type_rules.cr       # Per-type requirement/permitted-character rules
+    encoder.cr          # Percent-encoding and decoding
+    error.cr            # Purl::Error
+    version.cr
+spec/
+  purl_spec.cr          # Hand-written tests for Purl module
+  conformance_spec.cr   # Runs the official ECMA-427 conformance suite
+  fixtures/purl-spec/   # Vendored suite (see its README to refresh)
   spec_helper.cr
 ```
 

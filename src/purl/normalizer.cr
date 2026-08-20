@@ -4,11 +4,20 @@ module Purl
   # Handles type-specific normalization of purl components.
   module Normalizer
     def self.normalize_name(type : String, name : String) : String
-      # A name is a single path segment, so a raw "/" in a caller-supplied
-      # name cannot be a separator — it can only be a slash living *inside*
-      # the segment, which is exactly what the "%2F" marker stands for.
-      # Converting it up front makes a constructed name match the one you get
-      # back from parsing that purl, since the serialized form is identical.
+      # A `git` name is a repository path, so its slashes are real separators
+      # and each segment is normalized on its own. Empty segments are dropped
+      # for the same reason they are dropped from a namespace: the canonical
+      # form has none.
+      if type.in?(TypeRules::SLASHED_NAME_TYPES)
+        return name.split("/").reject(&.strip.empty?).map { |seg| normalize_name_part(type, seg) }.join("/")
+      end
+
+      # For every other type a name is a single path segment, so a raw "/" in
+      # a caller-supplied name cannot be a separator — it can only be a slash
+      # living *inside* the segment, which is exactly what the "%2F" marker
+      # stands for. Converting it up front makes a constructed name match the
+      # one you get back from parsing that purl, since the serialized form is
+      # identical.
       around_encoded_slash(name.gsub('/', "%2F")) { |part| normalize_name_part(type, part) }
     end
 
@@ -36,14 +45,23 @@ module Purl
     end
 
     # Types whose name is declared case-insensitive and must be lowercased.
+    # These are the types whose definition sets `name_definition` to
+    # `case_sensitive: false`, plus golang, whose definition keeps the flag
+    # true but notes that "the name shall be lowercased".
     LOWERCASE_NAME_TYPES = %w[
-      alpm apk bitbucket bitnami composer deb github golang hex luarocks npm oci
+      alpm apk bitbucket bitnami brew chrome-extension composer deb github
+      golang hex luarocks oci otp vscode-extension
     ]
 
-    # Types whose namespace is declared case-insensitive and must be lowercased.
+    # Types whose namespace is declared case-insensitive and must be
+    # lowercased, again with golang added for its "shall be lowercased" note.
     LOWERCASE_NAMESPACE_TYPES = %w[
-      alpm apk bitbucket composer deb github golang hex luarocks npm qpkg rpm
+      alpm apk bitbucket brew composer deb github golang hex luarocks qpkg rpm
+      vscode-extension yocto
     ]
+
+    # Types whose version is declared case-insensitive and must be lowercased.
+    LOWERCASE_VERSION_TYPES = %w[huggingface pypi vscode-extension]
 
     # Types whose namespace must be uppercased. `cpan` namespaces are CPAN
     # author IDs (CPANIDs), which the spec requires in uppercase.
@@ -74,12 +92,29 @@ module Purl
       end
     end
 
+    # A substring that identifies a Databricks MLflow tracking server.
+    DATABRICKS_HOST = "databricks"
+
+    # Apply the normalization rules that depend on another component.
+    #
+    # An mlflow model name takes its case from the tracking server: the type
+    # definition says that for Azure ML the name "is case sensitive and shall
+    # be kept as-is in the package URL; and for Databricks, it is case
+    # insensitive and shall be lowercased in the package URL". Only
+    # `repository_url` says which server it is, so this rule cannot live in
+    # `normalize_name`, which sees the name alone.
+    def self.normalize_name_for_qualifiers(type : String, name : String, qualifiers : Hash(String, String)?) : String
+      return name unless type == "mlflow"
+      url = qualifiers.try(&.["repository_url"]?)
+      return name unless url && url.downcase.includes?(DATABRICKS_HOST)
+      name.downcase
+    end
+
     # Normalize a type-specific version. Most types store the version
     # verbatim, but a few define case-insensitive version semantics.
     def self.normalize_version(type : String, version : String) : String
       case type
-      when "huggingface"
-        # The model ref / commit is case-insensitive per the spec.
+      when .in?(LOWERCASE_VERSION_TYPES)
         version.downcase
       when "oci"
         # OCI versions are typically a `sha256:...` digest which is

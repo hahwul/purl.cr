@@ -57,9 +57,12 @@ describe Purl do
         p.type.should eq("my-type.v2")
       end
 
-      it "allows valid type with plus sign" do
-        p = Purl::PackageURL.new("c++", nil, "pkg")
-        p.type.should eq("c++")
+      it "rejects a type with a plus sign" do
+        # ECMA-427 limits the type to "ASCII letters and numbers, period '.',
+        # and dash '-'"; '+' is not among them.
+        expect_raises(Purl::Error, /Invalid type/) do
+          Purl::PackageURL.new("c++", nil, "pkg")
+        end
       end
 
       it "allows valid qualifier keys with dots, underscores, hyphens" do
@@ -92,16 +95,22 @@ describe Purl do
         p.name.should eq("my-package")
       end
 
-      it "normalizes npm name to lowercase" do
+      it "preserves npm name case" do
+        # The npm type definition declares the name case sensitive: mixed-case
+        # packages published before 2015 were grandfathered in and lowercasing
+        # them would name a different (non-existent) package.
         p = Purl::PackageURL.new("npm", nil, "MyPackage")
-        p.name.should eq("mypackage")
+        p.name.should eq("MyPackage")
       end
 
-      # Types whose definition declares the name case-insensitive.
-      {"hex" => "Jason", "apk" => "Curl", "alpm" => "PacMan",
-       "bitnami" => "WordPress", "luarocks" => "LUA-resty-http"}.each do |type, raw|
+      # Types whose definition declares the name case-insensitive. Each is
+      # paired with a namespace its type definition accepts.
+      {"hex" => {nil, "Jason"}, "apk" => {"Alpine", "Curl"},
+       "alpm" => {"Arch", "PacMan"}, "bitnami" => {nil, "WordPress"},
+       "luarocks" => {nil, "LUA-resty-http"}, "brew" => {nil, "SQLite"},
+       "otp" => {nil, "Cowboy"}}.each do |type, (ns, raw)|
         it "normalizes #{type} name to lowercase" do
-          Purl::PackageURL.new(type, nil, raw).name.should eq(raw.downcase)
+          Purl::PackageURL.new(type, ns, raw).name.should eq(raw.downcase)
         end
       end
 
@@ -124,6 +133,36 @@ describe Purl do
       it "preserves cpan distribution name case" do
         p = Purl::PackageURL.new("cpan", "DROLSKY", "DateTime")
         p.name.should eq("DateTime")
+      end
+
+      it "lowercases a brew tap namespace and formula name" do
+        p = Purl::PackageURL.parse("pkg:brew/Homebrew/Core/SQLite@3.43.2")
+        p.namespace.should eq("homebrew/core")
+        p.name.should eq("sqlite")
+      end
+
+      it "lowercases a vscode-extension publisher and name" do
+        p = Purl::PackageURL.parse("pkg:vscode-extension/RedHat/Java@1.0.0")
+        p.namespace.should eq("redhat")
+        p.name.should eq("java")
+      end
+
+      # The mlflow definition ties the name's case to the tracking server:
+      # Databricks is case-insensitive, Azure ML is case-sensitive.
+      it "lowercases an mlflow name tracked on Databricks" do
+        p = Purl::PackageURL.parse(
+          "pkg:mlflow/CreditFraud@3?repository_url=https://adb-5245952564735461.0.azuredatabricks.net/api/2.0/mlflow")
+        p.name.should eq("creditfraud")
+      end
+
+      it "preserves an mlflow name tracked on Azure ML" do
+        p = Purl::PackageURL.parse(
+          "pkg:mlflow/CreditFraud@3?repository_url=https://westus2.api.azureml.ms/mlflow/v1.0")
+        p.name.should eq("CreditFraud")
+      end
+
+      it "preserves an mlflow name when no repository_url says otherwise" do
+        Purl::PackageURL.new("mlflow", nil, "CreditFraud").name.should eq("CreditFraud")
       end
 
       it "preserves cran name case" do
@@ -190,9 +229,10 @@ describe Purl do
     # Type-specific namespace normalization
     # =========================================================================
     describe "namespace normalization" do
-      it "normalizes npm namespace to lowercase" do
+      it "preserves npm namespace case" do
+        # The npm scope is case sensitive per the npm type definition.
         p = Purl::PackageURL.new("npm", "@Angular", "core")
-        p.namespace.should eq("@angular")
+        p.namespace.should eq("@Angular")
       end
 
       it "normalizes golang namespace to lowercase" do
@@ -222,7 +262,8 @@ describe Purl do
 
       # Types whose definition declares the namespace case-insensitive.
       {"hex" => "BitwiseOps", "apk" => "Alpine", "alpm" => "Arch",
-       "luarocks" => "Kong", "qpkg" => "Blackberry"}.each do |type, raw|
+       "luarocks" => "Kong", "qpkg" => "Blackberry", "brew" => "Homebrew",
+       "yocto" => "Core"}.each do |type, raw|
         it "normalizes #{type} namespace to lowercase" do
           Purl::PackageURL.new(type, raw, "pkg").namespace.should eq(raw.downcase)
         end
@@ -302,6 +343,17 @@ describe Purl do
         p = Purl::PackageURL.new("huggingface", "microsoft", "DialoGPT", "AbC")
         p.name.should eq("DialoGPT")
         p.version.should eq("abc")
+      end
+
+      # Types whose definition declares the version case-insensitive.
+      it "lowercases pypi version" do
+        p = Purl::PackageURL.new("pypi", nil, "django", "1.11.1.DEV1")
+        p.version.should eq("1.11.1.dev1")
+      end
+
+      it "lowercases vscode-extension version" do
+        p = Purl::PackageURL.new("vscode-extension", "redhat", "java", "1.46.2025091308-RC")
+        p.version.should eq("1.46.2025091308-rc")
       end
 
       it "lowercases oci version when it is a sha256 digest" do
@@ -647,9 +699,9 @@ describe Purl do
         p.name.should eq("my-package")
       end
 
-      it "normalizes npm namespace when parsing" do
+      it "preserves npm namespace case when parsing" do
         p = Purl::PackageURL.parse("pkg:npm/%40Angular/core@1.0.0")
-        p.namespace.should eq("@angular")
+        p.namespace.should eq("@Angular")
       end
 
       it "parses qualifiers with multiple key-value pairs" do
@@ -1014,15 +1066,15 @@ describe Purl do
     describe "%2F preservation" do
       # Type-specific normalization must not reach into the marker itself.
       it "keeps the %2F marker canonical when the type lowercases names" do
-        p = Purl::PackageURL.parse("pkg:npm/Foo%2FBar")
+        p = Purl::PackageURL.parse("pkg:hex/Foo%2FBar")
         p.name.should eq("foo%2Fbar")
-        p.to_s.should eq("pkg:npm/foo%2Fbar")
+        p.to_s.should eq("pkg:hex/foo%2Fbar")
       end
 
       it "keeps the %2F marker canonical when the type lowercases namespaces" do
-        p = Purl::PackageURL.parse("pkg:npm/A%2FB/c")
+        p = Purl::PackageURL.parse("pkg:hex/A%2FB/c")
         p.namespace.should eq("a%2Fb")
-        p.to_s.should eq("pkg:npm/a%2Fb/c")
+        p.to_s.should eq("pkg:hex/a%2Fb/c")
       end
 
       it "does not let pub name normalization rewrite the %2F marker" do
@@ -1037,8 +1089,8 @@ describe Purl do
       end
 
       it "still distinguishes an encoded slash from a real one after normalization" do
-        Purl::PackageURL.parse("pkg:pub/foo%2Fbar")
-          .should_not eq(Purl::PackageURL.parse("pkg:pub/foo/bar"))
+        Purl::PackageURL.parse("pkg:hex/foo%2Fbar")
+          .should_not eq(Purl::PackageURL.parse("pkg:hex/foo/bar"))
       end
 
       it "preserves %2F inside a namespace segment so it is not conflated with the path separator" do
@@ -1117,6 +1169,134 @@ describe Purl do
       it "rejects qualifier keys with invalid characters" do
         expect_raises(Purl::Error, /Invalid qualifier key/) do
           Purl::PackageURL.parse("pkg:generic/x?ar ch=amd64")
+        end
+      end
+
+      # ECMA-427: "The key shall be composed only of lowercase ASCII letters
+      # and numbers, period '.', dash '-' and underscore '_'." A purl whose
+      # key is not already lowercase is invalid, so it is rejected rather
+      # than silently repaired.
+      it "rejects a qualifier key that is not lowercase" do
+        expect_raises(Purl::Error, /Invalid qualifier key 'Platform'/) do
+          Purl::PackageURL.parse("pkg:gem/jruby-launcher@1.1.2?Platform=java")
+        end
+      end
+
+      it "rejects a qualifier key with an interior uppercase letter" do
+        expect_raises(Purl::Error, /Invalid qualifier key/) do
+          Purl::PackageURL.parse("pkg:generic/x?repositorY_url=example.com")
+        end
+      end
+
+      # The build algorithm joins "the lowercased key" with its value, so the
+      # constructor still normalizes a caller-supplied key.
+      it "lowercases a constructed qualifier key" do
+        p = Purl::PackageURL.new("gem", nil, "jruby-launcher", "1.1.2", {"Platform" => "java"})
+        p.to_s.should eq("pkg:gem/jruby-launcher@1.1.2?platform=java")
+      end
+    end
+
+    # =========================================================================
+    # Per-type component rules (purl type definitions)
+    # =========================================================================
+    describe "type rules" do
+      it "requires a namespace for a type whose definition demands one" do
+        expect_raises(Purl::Error, /type 'swift' requires a namespace/) do
+          Purl::PackageURL.parse("pkg:swift/some-package@1.0.0")
+        end
+      end
+
+      it "requires a namespace when building such a type" do
+        expect_raises(Purl::Error, /type 'vscode-extension' requires a namespace/) do
+          Purl::PackageURL.new("vscode-extension", nil, "java", "1.46.0")
+        end
+      end
+
+      it "rejects a namespace for a type whose definition prohibits one" do
+        expect_raises(Purl::Error, /type 'vcpkg' does not allow a namespace/) do
+          Purl::PackageURL.parse("pkg:vcpkg/boost/asio@1.84.0")
+        end
+      end
+
+      it "rejects a namespace when building a type that prohibits one" do
+        expect_raises(Purl::Error, /type 'otp' does not allow a namespace/) do
+          Purl::PackageURL.new("otp", "namespace", "hex", "2.1.1")
+        end
+      end
+
+      it "enforces the permitted characters of a name" do
+        expect_raises(Purl::Error, /Invalid name 'dogs' for type 'chrome-extension'/) do
+          Purl::PackageURL.parse("pkg:chrome-extension/dogs")
+        end
+      end
+
+      it "enforces the permitted characters of a version" do
+        expect_raises(Purl::Error, /Invalid version '1.2.3-beta'/) do
+          Purl::PackageURL.parse("pkg:chrome-extension/dlpngalgnefjeiefhmpklpfiohadpglk@1.2.3-beta")
+        end
+      end
+
+      it "accepts a name and version that match the permitted characters" do
+        p = Purl::PackageURL.parse("pkg:chrome-extension/dlpngalgnefjeiefhmpklpfiohadpglk@1.2.3")
+        p.name.should eq("dlpngalgnefjeiefhmpklpfiohadpglk")
+        p.version.should eq("1.2.3")
+      end
+
+      it "requires the qualifiers a definition marks required" do
+        expect_raises(Purl::Error, /type 'julia' requires the 'uuid' qualifier/) do
+          Purl::PackageURL.parse("pkg:julia/Dates")
+        end
+      end
+
+      it "accepts a purl that carries its required qualifier" do
+        p = Purl::PackageURL.parse("pkg:julia/Dates?uuid=ade2ca70-3891-5945-98fb-dc099432e06a")
+        p.name.should eq("Dates")
+      end
+
+      it "rejects a cpan module name in place of a distribution name" do
+        expect_raises(Purl::Error, /must not contain '::'/) do
+          Purl::PackageURL.parse("pkg:cpan/URI::PackageURL")
+        end
+      end
+
+      it "accepts a cpan distribution name" do
+        Purl::PackageURL.parse("pkg:cpan/GDT/URI-PackageURL").name.should eq("URI-PackageURL")
+      end
+    end
+
+    # =========================================================================
+    # Repository-path names (git)
+    # =========================================================================
+    describe "slashed names" do
+      it "splits a git purl into a host namespace and a repository path name" do
+        p = Purl::PackageURL.parse("pkg:git/codeberg.org/forgejo/forgejo@a72d2c07")
+        p.namespace.should eq("codeberg.org")
+        p.name.should eq("forgejo/forgejo")
+        p.version.should eq("a72d2c07")
+      end
+
+      it "serializes a git repository path with unencoded slashes" do
+        p = Purl::PackageURL.new("git", "codeberg.org", "forgejo/forgejo", "a72d2c07")
+        p.to_s.should eq("pkg:git/codeberg.org/forgejo/forgejo@a72d2c07")
+      end
+
+      it "round-trips a git purl carrying a subpath" do
+        input = "pkg:git/codeberg.org/forgejo/forgejo@a72d2c07#options/locale_readme.md"
+        p = Purl::PackageURL.parse(input)
+        p.subpath.should eq("options/locale_readme.md")
+        p.to_s.should eq(input)
+      end
+
+      it "preserves git namespace and name case" do
+        # git-definition.json declares both case_sensitive.
+        p = Purl::PackageURL.parse("pkg:git/GitLab.com/GNOME/adwaita-fonts")
+        p.namespace.should eq("GitLab.com")
+        p.name.should eq("GNOME/adwaita-fonts")
+      end
+
+      it "rejects a multi-segment git namespace, which cannot round-trip" do
+        expect_raises(Purl::Error, /must be a single segment/) do
+          Purl::PackageURL.new("git", "codeberg.org/forgejo", "forgejo")
         end
       end
     end
