@@ -31,6 +31,30 @@ and run by `spec/conformance_spec.cr`.
   value.
 - `#qualifiers` returns a copy, so mutating it can no longer break `==` and
   `#hash` for a purl already used as a Hash key.
+- Refreshed the vendored conformance suite to test schema 0.2, adding the ten
+  package types it had never covered (`bazel`, `brew`, `chrome-extension`,
+  `git`, `julia`, `opam`, `otp`, `vcpkg`, `vscode-extension`, `yocto`) and
+  taking it from 468 to 586 cases.
+- Component requirements from the purl type definitions are enforced: a type
+  that requires a namespace rejects a purl without one (`swift`,
+  `vscode-extension`, ...), and a type that prohibits one rejects a purl with
+  one (`vcpkg`, `otp`, `pypi`, ...).
+- Names and versions are checked against the permitted characters their type
+  definition pins (`chrome-extension`), qualifiers a definition marks required
+  are enforced (`julia`'s `uuid`, `swid`'s `tag_id`), and a `cpan` name may no
+  longer be a module name such as `URI::PackageURL`.
+- A qualifier key that is not already lowercase makes a *parsed* purl invalid,
+  per ECMA-427; keys passed to the constructor are still lowercased, as the
+  build algorithm requires.
+- `git` purls split into a host namespace and a repository-path name, so
+  `pkg:git/codeberg.org/forgejo/forgejo` keeps the name `forgejo/forgejo`.
+- `npm` names and scopes keep their case: the npm type definition declares
+  both case sensitive because mixed-case packages were grandfathered in.
+- Added the missing case rules for `brew`, `chrome-extension`, `otp`, `pypi`
+  versions, `vscode-extension` and `yocto`, and `mlflow` names now follow the
+  tracking server named by `repository_url`.
+- A type containing `+` is rejected: ECMA-427 limits it to ASCII letters,
+  digits, `.` and `-`.
 
 ## v0.2.0
 

@@ -5,6 +5,7 @@ require "uri"
 
 require "./purl/version"
 require "./purl/error"
+require "./purl/type_rules"
 require "./purl/normalizer"
 require "./purl/encoder"
 require "./purl/parser"

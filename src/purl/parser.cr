@@ -73,7 +73,17 @@ module Purl
       name : String
       namespace : String? = nil
 
-      if idx = remainder.rindex('/')
+      if type.in?(TypeRules::SLASHED_NAME_TYPES)
+        # A `git` name is the repository path on the host, so the split runs
+        # the other way: the first segment is the namespace (the host) and
+        # everything after it is the name, slashes and all. The generic
+        # right-to-left split would read `pkg:git/codeberg.org/forgejo/forgejo`
+        # as the namespace "codeberg.org/forgejo" and the name "forgejo".
+        segments = remainder.split("/").map { |seg| Encoder.decode_segment(seg) }
+        namespace = segments.shift?
+        namespace = nil if namespace.try(&.strip.empty?)
+        name = segments.join("/")
+      elsif idx = remainder.rindex('/')
         name = Encoder.decode_segment(remainder[(idx + 1)..])
         namespace_raw = remainder[...idx]
         namespace = namespace_raw.split("/").map { |seg| Encoder.decode_segment(seg) }.join("/")
@@ -109,13 +119,16 @@ module Purl
       raw.split("&").each do |pair|
         next if pair.empty?
         key, _, value = pair.partition("=")
-        key = key.downcase
         next if value.strip.empty?
-        # Per spec, qualifier keys are unencoded ASCII identifiers — reject
-        # anything that doesn't match the canonical form so two different
-        # encodings of the same key cannot survive into the parsed result.
+        # ECMA-427: "The key shall be composed only of lowercase ASCII letters
+        # and numbers, period '.', dash '-' and underscore '_'" and "shall not
+        # be percent-encoded". A key that is not already lowercase makes the
+        # purl invalid, so it is rejected rather than quietly downcased: the
+        # conformance suite requires `pkg:gem/jruby-launcher@1.1.2?Platform=java`
+        # to fail. Callers building a purl from components still get their keys
+        # normalized — see `PackageURL#normalize_qualifiers`.
         unless QUALIFIER_KEY_PATTERN.matches?(key)
-          raise Purl::Error.new("Invalid qualifier key '#{key}': must start with a letter and contain only lowercase ASCII letters, digits, '.', '_' or '-'")
+          raise Purl::Error.new("Invalid qualifier key '#{key}': must start with a lowercase letter and contain only lowercase ASCII letters, digits, '.', '_' or '-'")
         end
         # ECMA-427: "Each key shall be unique among all the keys of the
         # qualifiers component." Silently keeping the last occurrence would

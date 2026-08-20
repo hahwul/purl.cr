@@ -14,8 +14,10 @@ module Purl
   class PackageURL
     SCHEME = "pkg"
 
-    # Valid type pattern: starts with letter, contains only [a-zA-Z0-9.+\-]
-    TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9.+\-]*$/
+    # Valid type pattern: starts with letter, contains only [a-zA-Z0-9.\-].
+    # ECMA-427: the type "shall be composed only of ASCII letters and numbers,
+    # period '.', and dash '-'" and "shall start with an ASCII letter".
+    TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9.\-]*$/
 
     # Valid qualifier key pattern: starts with lowercase letter, contains only [a-z0-9._\-]
     QUALIFIER_KEY_PATTERN = /^[a-z][a-z0-9._\-]*$/
@@ -51,7 +53,7 @@ module Purl
 
       raise Purl::Error.new("Invalid type: type must not be empty") if @type.empty?
       unless TYPE_PATTERN.matches?(@type)
-        raise Purl::Error.new("Invalid type '#{@type}': must start with a letter and contain only ASCII letters, digits, '.', '+' or '-'")
+        raise Purl::Error.new("Invalid type '#{@type}': must start with a letter and contain only ASCII letters, digits, '.' or '-'")
       end
 
       raise Purl::Error.new("Invalid name: name must not be empty") if name.strip.empty?
@@ -71,10 +73,17 @@ module Purl
       end
 
       @namespace = ns ? normalize_optional_namespace(@type, ns) : nil
-      @name = Normalizer.normalize_name(@type, name)
       @version = ver ? Normalizer.normalize_version(@type, ver) : nil
+      # The qualifiers are normalized before the name because a few types
+      # (mlflow) derive the name's case from the `repository_url` qualifier.
       @qualifiers = normalize_qualifiers(qualifiers)
+      @name = Normalizer.normalize_name_for_qualifiers(
+        @type, Normalizer.normalize_name(@type, name), @qualifiers)
       @subpath = subpath ? Normalizer.normalize_subpath(subpath) : nil
+
+      raise Purl::Error.new("Invalid name: name must not be empty") if @name.empty?
+
+      TypeRules.validate(@type, @namespace, @name, @version, @qualifiers)
     end
 
     # Returns the Package URL as a string in the purl format.
@@ -96,7 +105,14 @@ module Purl
         end
       end
 
-      io << "/" << Encoder.encode_component(@name)
+      # A `git` name is a repository path whose slashes are separators, so
+      # each of its segments is encoded on its own; every other type's name
+      # is a single segment where a slash is percent-encoded.
+      io << "/"
+      @name.split("/").each_with_index do |seg, i|
+        io << "/" if i > 0
+        io << Encoder.encode_component(seg)
+      end
 
       if ver = @version
         io << "@" << Encoder.encode_literal(ver)
@@ -158,6 +174,10 @@ module Purl
 
       normalized = Hash(String, String).new
       qualifiers.each do |key, value|
+        # The build algorithm joins "the lowercased key" with its value, so a
+        # caller-supplied key is normalized here. A key parsed out of a purl
+        # string is *rejected* instead, because ECMA-427 requires the key to
+        # already be lowercase in a valid purl — see `Parser.parse_qualifiers`.
         k = key.downcase
         next if value.strip.empty?
         unless QUALIFIER_KEY_PATTERN.matches?(k)
