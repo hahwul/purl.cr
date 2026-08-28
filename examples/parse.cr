@@ -43,10 +43,8 @@ invalid_inputs = [
 ]
 
 invalid_inputs.each do |input|
-  begin
-    Purl::PackageURL.parse(input)
-    puts "#{input.inspect} => (unexpectedly valid)"
-  rescue ex : Purl::Error
-    puts "#{input.inspect} => Error: #{ex.message}"
-  end
+  Purl::PackageURL.parse(input)
+  puts "#{input.inspect} => (unexpectedly valid)"
+rescue ex : Purl::Error
+  puts "#{input.inspect} => Error: #{ex.message}"
 end
