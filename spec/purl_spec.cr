@@ -1299,6 +1299,33 @@ describe Purl do
           Purl::PackageURL.new("git", "codeberg.org/forgejo", "forgejo")
         end
       end
+
+      it "keeps the %2F marker canonical in a git name" do
+        p = Purl::PackageURL.new("git", "github.com", "a%2fb")
+        p.name.should eq("a%2Fb")
+        Purl::PackageURL.parse(p.to_s).should eq(p)
+      end
+    end
+
+    # =========================================================================
+    # Invalid UTF-8
+    # =========================================================================
+    describe "invalid UTF-8" do
+      it "rejects a percent-encoded byte sequence that is not UTF-8" do
+        ["pkg:npm/%FF", "pkg:npm/%C3/a", "pkg:npm/a@%FF", "pkg:npm/a?k=%FF", "pkg:npm/a#%FF"].each do |input|
+          expect_raises(Purl::Error, /UTF-8/) { Purl::PackageURL.parse(input) }
+        end
+      end
+
+      it "rejects a raw string that is not UTF-8" do
+        expect_raises(Purl::Error, /UTF-8/) { Purl::PackageURL.parse("pkg:npm/a?k\xFF=v") }
+      end
+
+      it "rejects a constructor component that is not UTF-8" do
+        expect_raises(Purl::Error, /UTF-8/) do
+          Purl::PackageURL.new("npm", nil, String.new(Bytes[0x61, 0xFF]))
+        end
+      end
     end
   end
 end

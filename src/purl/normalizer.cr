@@ -9,7 +9,10 @@ module Purl
       # for the same reason they are dropped from a namespace: the canonical
       # form has none.
       if type.in?(TypeRules::SLASHED_NAME_TYPES)
-        return name.split("/").reject(&.strip.empty?).map { |seg| normalize_name_part(type, seg) }.join("/")
+        segments = name.split("/").reject(&.strip.empty?).map do |seg|
+          around_encoded_slash(seg) { |part| normalize_name_part(type, part) }
+        end
+        return segments.join("/")
       end
 
       # For every other type a name is a single path segment, so a raw "/" in
@@ -135,7 +138,11 @@ module Purl
     end
 
     private def self.decode_subpath_segments(raw : String) : Array(String)
-      raw.split("/").flat_map { |seg| URI.decode(seg).split("/") }
+      raw.split("/").flat_map do |seg|
+        decoded = URI.decode(seg)
+        raise Purl::Error.new("Invalid subpath: segments must be valid UTF-8 once percent-decoded") unless decoded.valid_encoding?
+        decoded.split("/")
+      end
     end
 
     def self.normalize_subpath_segments(segments : Array(String)) : String?
