@@ -49,6 +49,15 @@ module Purl
       qualifiers : Hash(String, String)? = nil,
       subpath : String? = nil,
     )
+      # ECMA-427 5.4: a component string is UTF-8. Invalid bytes (e.g. a
+      # percent-decoded `%FF`) would crash the regex-based normalization or be
+      # silently re-encoded as U+FFFD, so the purl is rejected instead.
+      components = [type, namespace, name, version, subpath]
+      qualifiers.try &.each { |key, value| components << key << value }
+      unless components.all? { |c| c.nil? || c.valid_encoding? }
+        raise Purl::Error.new("Invalid Package URL: components must be valid UTF-8")
+      end
+
       @type = type.downcase
 
       raise Purl::Error.new("Invalid type: type must not be empty") if @type.empty?

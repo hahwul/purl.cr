@@ -9,6 +9,9 @@ module Purl
 
     # Parses a Package URL string and returns a PackageURL instance.
     def self.parse(purl_string : String) : PackageURL
+      # The parser runs regexes over raw pieces before PackageURL validates
+      # the decoded components, and those raise ArgumentError on invalid UTF-8.
+      raise Purl::Error.new("Invalid Package URL: not valid UTF-8") unless purl_string.valid_encoding?
       remainder = purl_string.strip
       raise Purl::Error.new("Invalid Package URL: empty string") if remainder.empty?
 
