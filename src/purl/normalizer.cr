@@ -20,8 +20,10 @@ module Purl
       # living *inside* the segment, which is exactly what the "%2F" marker
       # stands for. Converting it up front makes a constructed name match the
       # one you get back from parsing that purl, since the serialized form is
-      # identical.
-      around_encoded_slash(name.gsub('/', "%2F")) { |part| normalize_name_part(type, part) }
+      # identical. Leading and trailing slashes are dropped first: ECMA-427
+      # 5.6.4 says they "are not significant and should be stripped. They are
+      # not part of the name", so "/foo/" names "foo", not "%2Ffoo%2F".
+      around_encoded_slash(name.strip('/').gsub('/', "%2F")) { |part| normalize_name_part(type, part) }
     end
 
     def self.normalize_namespace(type : String, namespace : String) : String
@@ -110,7 +112,7 @@ module Purl
       return name unless type == "mlflow"
       url = qualifiers.try(&.["repository_url"]?)
       return name unless url && url.downcase.includes?(DATABRICKS_HOST)
-      name.downcase
+      around_encoded_slash(name, &.downcase)
     end
 
     # Normalize a type-specific version. Most types store the version

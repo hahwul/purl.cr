@@ -120,6 +120,15 @@ describe Purl do
         p.to_s.should eq("pkg:generic/foo%2Fbar")
       end
 
+      it "strips leading and trailing slashes from a constructed name" do
+        p = Purl::PackageURL.new("npm", "ns", "/foo/bar/")
+        p.name.should eq("foo%2Fbar")
+        p.to_s.should eq("pkg:npm/ns/foo%2Fbar")
+        expect_raises(Purl::Error, /name must not be empty/) do
+          Purl::PackageURL.new("npm", nil, "//")
+        end
+      end
+
       it "makes a constructed name with a slash equal to its parsed form" do
         original = Purl::PackageURL.new("generic", nil, "foo/bar")
         original.should eq(Purl::PackageURL.parse("pkg:generic/foo%2Fbar"))
@@ -163,6 +172,11 @@ describe Purl do
 
       it "preserves an mlflow name when no repository_url says otherwise" do
         Purl::PackageURL.new("mlflow", nil, "CreditFraud").name.should eq("CreditFraud")
+      end
+
+      it "keeps the %2F marker canonical when lowercasing a Databricks mlflow name" do
+        p = Purl::PackageURL.parse("pkg:mlflow/Credit%2FFraud?repository_url=https://databricks.com")
+        p.name.should eq("credit%2Ffraud")
       end
 
       it "preserves cran name case" do
