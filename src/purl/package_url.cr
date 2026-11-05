@@ -90,7 +90,7 @@ module Purl
         @type, Normalizer.normalize_name(@type, name), @qualifiers)
       @subpath = subpath ? Normalizer.normalize_subpath(subpath) : nil
 
-      raise Purl::Error.new("Invalid name: name must not be empty") if @name.empty?
+      raise Purl::Error.new("Invalid name: name must not be empty") if @name.strip.empty?
 
       TypeRules.validate(@type, @namespace, @name, @version, @qualifiers)
     end

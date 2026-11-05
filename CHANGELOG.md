@@ -55,6 +55,9 @@ and run by `spec/conformance_spec.cr`.
   tracking server named by `repository_url`.
 - A type containing `+` is rejected: ECMA-427 limits it to ASCII letters,
   digits, `.` and `-`.
+- Leading and trailing slashes around a constructed name are stripped, per
+  ECMA-427 5.6.4 (`"/foo/"` names `foo`, not `%2Ffoo%2F`), and lowercasing a
+  Databricks `mlflow` name no longer rewrites the `%2F` marker to `%2f`.
 
 ## v0.2.0
 

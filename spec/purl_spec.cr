@@ -124,8 +124,12 @@ describe Purl do
         p = Purl::PackageURL.new("npm", "ns", "/foo/bar/")
         p.name.should eq("foo%2Fbar")
         p.to_s.should eq("pkg:npm/ns/foo%2Fbar")
-        expect_raises(Purl::Error, /name must not be empty/) do
-          Purl::PackageURL.new("npm", nil, "//")
+        Purl::PackageURL.parse(p.to_s).should eq(p)
+        # Nothing but slashes and whitespace leaves no name behind.
+        ["//", "/ /"].each do |name|
+          expect_raises(Purl::Error, /name must not be empty/) do
+            Purl::PackageURL.new("npm", nil, name)
+          end
         end
       end
 
@@ -177,6 +181,10 @@ describe Purl do
       it "keeps the %2F marker canonical when lowercasing a Databricks mlflow name" do
         p = Purl::PackageURL.parse("pkg:mlflow/Credit%2FFraud?repository_url=https://databricks.com")
         p.name.should eq("credit%2Ffraud")
+        built = Purl::PackageURL.new("mlflow", nil, "Credit/Fraud", nil,
+          {"repository_url" => "https://databricks.com"})
+        built.name.should eq("credit%2Ffraud")
+        built.should eq(p)
       end
 
       it "preserves cran name case" do
