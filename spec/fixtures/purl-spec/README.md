@@ -26,4 +26,4 @@ The listing step matters: purl-spec adds new package types over time, so
 looping over the files already vendored here would silently miss them.
 
 [spec]: https://github.com/package-url/purl-spec
-[schema]: https://packageurl.org/schemas/purl-test.schema-0.2.json
+[schema]: https://packageurl.org/purl-schemas/purl-test.schema-0.2.json
