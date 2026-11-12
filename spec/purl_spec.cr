@@ -98,6 +98,8 @@ describe Purl do
       it "collapses runs of pypi '-', '_' and '.' into a single hyphen" do
         Purl::PackageURL.new("pypi", nil, "friendly.bard").name.should eq("friendly-bard")
         Purl::PackageURL.new("pypi", nil, "friendly--bard").name.should eq("friendly-bard")
+        Purl::PackageURL.new("pypi", nil, "My.PyPI_.--._Package", "1.11.1.dev1").to_s
+          .should eq("pkg:pypi/my-pypi-package@1.11.1.dev1")
         Purl::PackageURL.parse("pkg:pypi/My.PyPI_.--._Package@1.0").to_s
           .should eq("pkg:pypi/my-pypi-package@1.0")
         Purl::PackageURL.parse("pkg:pypi/zope.interface")
@@ -682,6 +684,13 @@ describe Purl do
         Purl::PackageURL.parse("pkg:git/codeberg.org/forgejo/forgejo/").to_s
           .should eq("pkg:git/codeberg.org/forgejo/forgejo")
         Purl::PackageURL.parse("pkg:npm/foo/").should eq(Purl::PackageURL.new("npm", nil, "foo/"))
+      end
+
+      it "keeps a slash after the version in the version, as the right-to-left split does" do
+        p = Purl::PackageURL.parse("pkg:npm/foo@1.0/")
+        p.name.should eq("foo")
+        p.version.should eq("1.0/")
+        p.to_s.should eq("pkg:npm/foo@1.0%2F")
       end
 
       it "still rejects a purl that is only slashes after the type" do

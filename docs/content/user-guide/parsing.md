@@ -19,7 +19,7 @@ The parser follows the right-to-left parsing algorithm specified by the purl spe
 3. Split off the **scheme** from the left using `:` (must be `pkg`)
 4. Remove leading slashes
 5. Split off the **type** from the left using the first `/`
-6. Split off the **version** from the right using `@`
+6. Split off the **version** from the right using `@`; with no version, strip trailing slashes
 7. Split off the **name** from the right using the last `/`
 8. Remaining text becomes the **namespace**
 
