@@ -19,23 +19,15 @@ purl.type  # => "npm"
 
 ## Normalization Rules by Type
 
-### npm
-
-- Name and namespace are **lowercased**
-
-```crystal
-purl = Purl::PackageURL.new("npm", "@Angular", "Core")
-purl.namespace  # => "@angular"
-purl.name       # => "core"
-```
-
 ### pypi
 
-- Name is **lowercased** and **underscores are replaced with hyphens**
+- Name is **lowercased** and each run of `-`, `_` and `.` is replaced with a single hyphen (PEP 503)
 
 ```crystal
 purl = Purl::PackageURL.new("pypi", nil, "Django_Rest_Framework")
 purl.name  # => "django-rest-framework"
+
+Purl::PackageURL.new("pypi", nil, "zope.interface").name  # => "zope-interface"
 ```
 
 ### golang
@@ -79,7 +71,7 @@ purl.name       # => "purl.cr"
 
 ### Other Types
 
-Types not listed above (e.g., `maven`, `gem`, `nuget`, `cargo`) preserve the original case for name and namespace:
+Types not listed above (e.g., `npm`, `maven`, `gem`, `nuget`, `cargo`) preserve the original case for name and namespace:
 
 ```crystal
 purl = Purl::PackageURL.new("maven", "org.Apache", "Commons")
@@ -108,13 +100,13 @@ purl.qualifiers  # => {"arch" => "amd64"} (key lowercased, empty removed)
 Subpath segments are cleaned:
 
 - Empty segments are removed
-- `.` and `..` segments are stripped
+- `.` and `..` segments are discarded (not resolved against the previous segment)
 - Leading/trailing slashes are removed
 
 ```crystal
 purl = Purl::PackageURL.new(
   "github", "user", "repo", nil,
-  subpath: "./src/../src/lib/"
+  subpath: "./src/../lib/"
 )
 purl.subpath  # => "src/lib"
 ```

@@ -51,7 +51,7 @@ purl = Purl::PackageURL.new(
 
 ## Properties
 
-All properties are readable and writable:
+All properties are read-only; build a new `PackageURL` to change a component:
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -112,5 +112,5 @@ Returns a hash value based on all components. Allows `PackageURL` to be used as 
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `SCHEME` | `"pkg"` | The purl URL scheme |
-| `TYPE_PATTERN` | `/^[a-zA-Z][a-zA-Z0-9.+\-]*$/` | Valid type regex |
+| `TYPE_PATTERN` | `/^[a-zA-Z][a-zA-Z0-9.\-]*$/` | Valid type regex |
 | `QUALIFIER_KEY_PATTERN` | `/^[a-z][a-z0-9._\-]*$/` | Valid qualifier key regex |
