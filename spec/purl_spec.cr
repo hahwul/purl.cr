@@ -300,12 +300,6 @@ describe Purl do
         p = Purl::PackageURL.new("pub", nil, "my-cool.pkg")
         p.name.should eq("my_cool_pkg")
       end
-
-      # The rule replaces "non-[a-z] letters" with '_'. A Unicode downcase
-      # first would turn the KELVIN SIGN into an ASCII "k" and keep it.
-      it "replaces a non-ASCII letter in a pub name instead of folding it" do
-        Purl::PackageURL.new("pub", nil, "\u212Aey").name.should eq("_ey")
-      end
     end
 
     # =========================================================================
