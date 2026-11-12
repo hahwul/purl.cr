@@ -123,22 +123,20 @@ module Purl
     end
 
     # Decodes the subpath segment by segment, per how-to-parse: "Percent-decode
-    # each segment", discard empty, `.` and `..` segments, and "Report an error
-    # if any segment contains a slash". ECMA-427 5.6.7 agrees that a decoded
-    # segment "shall not contain any slash". The decoded segments are joined
-    # with `/` for PackageURL, which takes its subpath as decoded text and
-    # does not decode it again, so `#foo%252Fbar` stays the one segment
-    # "foo%2Fbar".
+    # each segment" and "Report an error if any segment contains a slash".
+    # ECMA-427 5.6.7 agrees that a decoded segment "shall not contain any
+    # slash". The decoded segments are joined with `/` for PackageURL, which
+    # takes its subpath as decoded text (it does not decode it again, so
+    # `#foo%252Fbar` stays the one segment "foo%2Fbar"), discards empty, `.`
+    # and `..` segments, and rejects invalid UTF-8.
     private def self.decode_subpath(raw : String) : String
-      raw.split("/").compact_map do |seg|
+      raw.split("/").join("/") do |seg|
         decoded = URI.decode(seg)
-        raise Purl::Error.new("Invalid subpath: segments must be valid UTF-8 once percent-decoded") unless decoded.valid_encoding?
-        next if decoded.empty? || decoded == "." || decoded == ".."
         if decoded.includes?('/')
           raise Purl::Error.new("Invalid subpath: segment '#{seg}' contains an encoded slash")
         end
         decoded
-      end.join("/")
+      end
     end
 
     # Parses qualifier query string into a hash of key-value pairs.

@@ -136,11 +136,11 @@ module Purl
     # lowercase".
     LOWERCASE_SUBPATH_TYPES = %w[otp]
 
-    # Normalize a caller-supplied subpath. Like every other component passed
-    # to the constructor, it is taken as decoded text: each `/` separates two
+    # Normalize a caller-supplied subpath. Like the version and qualifier
+    # values passed to the constructor, it is taken as decoded text: each `/` separates two
     # literal segments and a `%` is a literal percent sign that serializes as
-    # `%25`. Nothing is percent-decoded here, so a purl rebuilt from its own
-    # getters is unchanged. Traversal stays impossible because `.` and `..`
+    # `%25`. Nothing is percent-decoded here, so a subpath rebuilt from its
+    # own getter is unchanged. Traversal stays impossible because `.` and `..`
     # segments are discarded, and an encoded `%2E%2E` is just a literal
     # segment that `#to_s` writes back as `%252E%252E`.
     def self.normalize_subpath(type : String, subpath : String) : String?
