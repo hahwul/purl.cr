@@ -146,3 +146,24 @@ describe "purl-spec conformance suite" do
     end
   end
 end
+
+# Property: a purl rebuilt from its own getters is the same purl. Each getter
+# returns a decoded component and the constructor takes decoded components,
+# so getter -> constructor -> `to_s` must reproduce the original string for
+# every valid purl in the official corpus.
+describe "getter round-trip over the purl-spec corpus" do
+  Dir.glob(File.join(__DIR__, "fixtures", "purl-spec", "**", "*.json")).sort.each do |path|
+    JSON.parse(File.read(path))["tests"].as_a.each_with_index do |test, index|
+      next if test["expected_failure"]?.try(&.as_bool?)
+      kind = test["test_type"].as_s
+      next if unsupported?(path, test["description"].as_s, kind, test["input"])
+
+      it "#{File.basename(path)} ##{index} #{kind}" do
+        purl = kind == "build" ? build_from(test["input"]) : Purl::PackageURL.parse(test["input"].as_s)
+        rebuilt = Purl::PackageURL.new(purl.type, purl.namespace, purl.name, purl.version, purl.qualifiers, purl.subpath)
+        rebuilt.to_s.should eq(purl.to_s)
+        rebuilt.should eq(purl)
+      end
+    end
+  end
+end

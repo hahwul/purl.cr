@@ -1,5 +1,3 @@
-require "uri"
-
 module Purl
   # Handles type-specific normalization of purl components.
   module Normalizer
@@ -133,21 +131,21 @@ module Purl
       end
     end
 
-    # Normalize a caller-supplied subpath. Decodes each segment so a
-    # traversal marker hidden behind percent-encoding (e.g. %2E%2E) can't
-    # bypass the `..` filter, and re-splits on any decoded slash (e.g. an
-    # encoded `%2E%2E%2Fbar` segment becomes ["..", "bar"] — the leading
-    # `..` is then dropped).
-    def self.normalize_subpath(subpath : String) : String?
-      normalize_subpath_segments(decode_subpath_segments(subpath))
-    end
+    # Types whose `subpath_definition` sets `case_sensitive: false`. The type
+    # definition schema says that for such a component "the valid form is
+    # lowercase".
+    LOWERCASE_SUBPATH_TYPES = %w[otp]
 
-    private def self.decode_subpath_segments(raw : String) : Array(String)
-      raw.split("/").flat_map do |seg|
-        decoded = URI.decode(seg)
-        raise Purl::Error.new("Invalid subpath: segments must be valid UTF-8 once percent-decoded") unless decoded.valid_encoding?
-        decoded.split("/")
-      end
+    # Normalize a caller-supplied subpath. Like the version and qualifier
+    # values passed to the constructor, it is taken as decoded text: each `/` separates two
+    # literal segments and a `%` is a literal percent sign that serializes as
+    # `%25`. Nothing is percent-decoded here, so a subpath rebuilt from its
+    # own getter is unchanged. Traversal stays impossible because `.` and `..`
+    # segments are discarded, and an encoded `%2E%2E` is just a literal
+    # segment that `#to_s` writes back as `%252E%252E`.
+    def self.normalize_subpath(type : String, subpath : String) : String?
+      subpath = subpath.downcase if type.in?(LOWERCASE_SUBPATH_TYPES)
+      normalize_subpath_segments(subpath.split("/"))
     end
 
     def self.normalize_subpath_segments(segments : Array(String)) : String?

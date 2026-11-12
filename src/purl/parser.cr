@@ -17,12 +17,8 @@ module Purl
 
       # Step 1: Split off the subpath from the right side using `#`
       subpath : String? = nil
-      # The raw (still percent-encoded) subpath is handed to PackageURL, which
-      # decodes and normalizes it exactly once. Decoding it here as well would
-      # decode it twice: `#foo%252Fbar` would become "foo%2Fbar" and then
-      # "foo/bar", turning one literal segment into two.
       if idx = remainder.rindex('#')
-        subpath = remainder[(idx + 1)..]
+        subpath = decode_subpath(remainder[(idx + 1)..])
         remainder = remainder[...idx]
       end
 
@@ -124,6 +120,23 @@ module Purl
       segment_start = (slash = remainder.rstrip('/').rindex('/')) ? slash + 1 : 0
       idx = remainder.rindex('@')
       idx && idx >= segment_start ? idx : nil
+    end
+
+    # Decodes the subpath segment by segment, per how-to-parse: "Percent-decode
+    # each segment" and "Report an error if any segment contains a slash".
+    # ECMA-427 5.6.7 agrees that a decoded segment "shall not contain any
+    # slash". The decoded segments are joined with `/` for PackageURL, which
+    # takes its subpath as decoded text (it does not decode it again, so
+    # `#foo%252Fbar` stays the one segment "foo%2Fbar"), discards empty, `.`
+    # and `..` segments, and rejects invalid UTF-8.
+    private def self.decode_subpath(raw : String) : String
+      raw.split("/").join("/") do |seg|
+        decoded = URI.decode(seg)
+        if decoded.includes?('/')
+          raise Purl::Error.new("Invalid subpath: segment '#{seg}' contains an encoded slash")
+        end
+        decoded
+      end
     end
 
     # Parses qualifier query string into a hash of key-value pairs.

@@ -14,7 +14,7 @@ purl = Purl::PackageURL.parse("pkg:npm/%40angular/animation@12.3.1")
 
 The parser follows the right-to-left parsing algorithm specified by the purl spec:
 
-1. Split off the **subpath** from the right using `#`
+1. Split off the **subpath** from the right using `#`, split it on `/` and percent-decode each segment; a segment that decodes to contain `/` (`#a%2Fb`) raises `Purl::Error`
 2. Split off the **qualifiers** from the right using `?`
 3. Split off the **scheme** from the left using `:` (must be `pkg`)
 4. Remove leading slashes

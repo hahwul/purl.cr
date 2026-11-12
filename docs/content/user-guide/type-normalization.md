@@ -102,6 +102,7 @@ Subpath segments are cleaned:
 - Empty segments are removed
 - `.` and `..` segments are discarded (not resolved against the previous segment)
 - Leading/trailing slashes are removed
+- `otp` subpaths are lowercased, because the otp type definition marks the subpath case insensitive
 
 ```crystal
 purl = Purl::PackageURL.new(
@@ -109,4 +110,14 @@ purl = Purl::PackageURL.new(
   subpath: "./src/../lib/"
 )
 purl.subpath  # => "src/lib"
+```
+
+A subpath passed to the constructor is decoded text, like the version and
+qualifier values: it is not percent-decoded, and a literal `%` serializes as
+`%25`. So a subpath rebuilt from its own getter is unchanged.
+
+```crystal
+purl = Purl::PackageURL.new("npm", nil, "pkg", subpath: "50%25/foo%2Fbar")
+purl.subpath  # => "50%25/foo%2Fbar"
+purl.to_s     # => "pkg:npm/pkg#50%2525/foo%252Fbar"
 ```
