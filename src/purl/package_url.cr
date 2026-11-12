@@ -88,7 +88,7 @@ module Purl
       @qualifiers = normalize_qualifiers(qualifiers)
       @name = Normalizer.normalize_name_for_qualifiers(
         @type, Normalizer.normalize_name(@type, name), @qualifiers)
-      @subpath = subpath ? Normalizer.normalize_subpath(subpath) : nil
+      @subpath = subpath ? Normalizer.normalize_subpath(@type, subpath) : nil
 
       raise Purl::Error.new("Invalid name: name must not be empty") if @name.strip.empty?
 

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Breaking
+
+- A subpath passed to the constructor is no longer percent-decoded. It is
+  decoded text, like every other component, so `subpath: "50%25"` keeps the
+  literal `50%25` (serialized as `#50%2525`) instead of becoming `50%`, and
+  `subpath: "a%e9"` no longer raises. `.`, `..` and empty segments are still
+  dropped. A purl rebuilt from its own getters is now always the same purl.
+- Parsing a subpath segment that decodes to contain `/` raises
+  `Purl::Error`, per how-to-parse ("Report an error if any segment contains
+  a slash") and ECMA-427 5.6.7. `pkg:npm/pkg#foo%2Fbar` used to be read as
+  the two segments `foo/bar`.
+- `Normalizer.normalize_subpath` takes the type as its first argument.
+- `otp` subpaths are lowercased: the otp type definition sets the subpath
+  `case_sensitive: false`, whose valid form the schema defines as lowercase.
+
 Correctness pass over parsing, normalization and encoding. The official
 ECMA-427 conformance suite is now vendored under `spec/fixtures/purl-spec`
 and run by `spec/conformance_spec.cr`.

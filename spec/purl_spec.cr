@@ -564,10 +564,35 @@ describe Purl do
         (Purl::PackageURL.parse(p.to_s) == p).should be_true
       end
 
-      it "splits an encoded slash in a subpath into separate segments" do
-        p = Purl::PackageURL.parse("pkg:npm/pkg#foo%2Fbar")
-        p.subpath.should eq("foo/bar")
-        p.to_s.should eq("pkg:npm/pkg#foo/bar")
+      it "rejects a parsed subpath segment that decodes to contain a slash" do
+        # how-to-parse: "Report an error if any segment contains a slash".
+        expect_raises(Purl::Error, /encoded slash/) do
+          Purl::PackageURL.parse("pkg:npm/pkg#foo%2Fbar")
+        end
+        expect_raises(Purl::Error, /encoded slash/) do
+          Purl::PackageURL.parse("pkg:npm/pkg#a/b%2fc")
+        end
+      end
+
+      it "takes a constructed subpath as decoded text" do
+        p = Purl::PackageURL.new("npm", nil, "pkg", subpath: "foo%2Fbar/50%25/a%e9")
+        p.subpath.should eq("foo%2Fbar/50%25/a%e9")
+        p.to_s.should eq("pkg:npm/pkg#foo%252Fbar/50%2525/a%25e9")
+        Purl::PackageURL.parse(p.to_s).should eq(p)
+      end
+
+      it "rebuilds a parsed subpath unchanged from its getter" do
+        p = Purl::PackageURL.parse("pkg:npm/pkg#foo%252Fbar/50%25/a%25e9")
+        p.subpath.should eq("foo%2Fbar/50%/a%e9")
+        rebuilt = Purl::PackageURL.new(p.type, p.namespace, p.name, subpath: p.subpath)
+        rebuilt.should eq(p)
+        rebuilt.to_s.should eq(p.to_s)
+      end
+
+      it "lowercases an otp subpath, whose definition is case insensitive" do
+        Purl::PackageURL.new("otp", nil, "asn1", subpath: "SRC/Asn1ct.erl").subpath.should eq("src/asn1ct.erl")
+        Purl::PackageURL.parse("pkg:otp/asn1#SRC/Asn1ct.erl").to_s.should eq("pkg:otp/asn1#src/asn1ct.erl")
+        Purl::PackageURL.new("npm", nil, "pkg", subpath: "SRC").subpath.should eq("SRC")
       end
 
       it "drops whitespace-only subpath segments" do
@@ -1192,16 +1217,24 @@ describe Purl do
     # Subpath traversal hardening
     # =========================================================================
     describe "subpath traversal" do
-      it "strips traversal segments hidden behind percent-encoded slash" do
-        p = Purl::PackageURL.parse("pkg:generic/x#foo/%2E%2E%2Fbar")
-        # Decoded segment "../bar" is split into ["..", "bar"]; the leading
-        # ".." is filtered, leaving "foo/bar".
-        p.subpath.should eq("foo/bar")
+      it "rejects traversal hidden behind a percent-encoded slash" do
+        # The decoded segment "../bar" contains a slash, which how-to-parse
+        # makes an error rather than a second split.
+        expect_raises(Purl::Error) do
+          Purl::PackageURL.parse("pkg:generic/x#foo/%2E%2E%2Fbar")
+        end
       end
 
       it "strips traversal segments passed via the constructor" do
-        p = Purl::PackageURL.new("generic", nil, "x", subpath: "%2E%2E/bar")
-        p.subpath.should eq("bar")
+        p = Purl::PackageURL.new("generic", nil, "x", subpath: "../a/./../bar/..")
+        p.subpath.should eq("a/bar")
+        # A constructed subpath is not decoded, so an encoded dot-dot is a
+        # literal segment that serializes with its `%` escaped and parses back
+        # as the same literal, never as `..`.
+        q = Purl::PackageURL.new("generic", nil, "x", subpath: "%2E%2E/bar")
+        q.subpath.should eq("%2E%2E/bar")
+        q.to_s.should eq("pkg:generic/x#%252E%252E/bar")
+        Purl::PackageURL.parse(q.to_s).subpath.should eq("%2E%2E/bar")
       end
 
       it "strips fully-percent-encoded traversal" do

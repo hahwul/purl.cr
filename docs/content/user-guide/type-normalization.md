@@ -102,6 +102,17 @@ Subpath segments are cleaned:
 - Empty segments are removed
 - `.` and `..` segments are discarded (not resolved against the previous segment)
 - Leading/trailing slashes are removed
+- `otp` subpaths are lowercased, because the otp type definition marks the subpath case insensitive
+
+A subpath passed to the constructor is decoded text, like every other
+component: it is not percent-decoded, and a literal `%` serializes as `%25`.
+So a purl rebuilt from its own getters is the same purl.
+
+```crystal
+purl = Purl::PackageURL.new("npm", nil, "pkg", subpath: "50%25/foo%2Fbar")
+purl.subpath  # => "50%25/foo%2Fbar"
+purl.to_s     # => "pkg:npm/pkg#50%2525/foo%252Fbar"
+```
 
 ```crystal
 purl = Purl::PackageURL.new(
