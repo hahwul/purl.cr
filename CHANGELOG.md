@@ -23,6 +23,16 @@ and run by `spec/conformance_spec.cr`.
 
 ### Fixed
 
+- The type and qualifier key patterns are anchored with `\A`/`\z`, so a
+  trailing newline (`pkg:npm\n/foo`, `?arch\n=x`) is rejected instead of
+  serialized back out.
+- The scheme, type and qualifier keys, which ECMA-427 limits to ASCII, are
+  case-folded as ASCII only. A Unicode downcase mapped the KELVIN SIGN
+  (U+212A) to `k`, so `pkg:\u212Aube/x` parsed as type `kube`. Names,
+  namespaces and versions, which may hold any Unicode text, keep the
+  Unicode lowercase mapping.
+- The chrome-extension version accepts ASCII digits only; Crystal's `\d`
+  also matched digits such as `١` (U+0661) and `１` (U+FF11).
 - pypi names collapse each run of `-`, `_` and `.` into a single `-`, as the
   pypi type definition (PEP 503) requires: `pkg:pypi/zope.interface` is now
   `pkg:pypi/zope-interface`. Purls stored in the old form compare unequal to

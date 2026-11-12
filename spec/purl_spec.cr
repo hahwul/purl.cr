@@ -65,6 +65,50 @@ describe Purl do
         end
       end
 
+      # `$` also matches before a trailing newline, so the type and qualifier
+      # key patterns must anchor with `\z` or "npm\n" passes as a type.
+      it "rejects a type with a trailing newline" do
+        expect_raises(Purl::Error, /Invalid type/) do
+          Purl::PackageURL.new("npm\n", nil, "pkg")
+        end
+        expect_raises(Purl::Error, /Invalid type/) do
+          Purl::PackageURL.parse("pkg:npm\n/pkg")
+        end
+      end
+
+      it "rejects a qualifier key with a trailing newline" do
+        expect_raises(Purl::Error, /Invalid qualifier key/) do
+          Purl::PackageURL.new("npm", nil, "pkg", nil, {"arch\n" => "x"})
+        end
+        expect_raises(Purl::Error, /Invalid qualifier key/) do
+          Purl::PackageURL.parse("pkg:npm/pkg?arch\n=x")
+        end
+      end
+
+      # ECMA-427 limits the scheme, type and qualifier keys to ASCII, so only
+      # ASCII letters are case-folded. A full Unicode downcase maps the
+      # KELVIN SIGN (U+212A) to an ASCII "k" and would accept these.
+      it "does not fold a non-ASCII letter into an ASCII type" do
+        expect_raises(Purl::Error, /Invalid type/) do
+          Purl::PackageURL.new("\u212Aube", nil, "pkg")
+        end
+        expect_raises(Purl::Error, /Invalid type/) do
+          Purl::PackageURL.parse("pkg:\u212Aube/pkg")
+        end
+      end
+
+      it "does not fold a non-ASCII letter into the pkg scheme" do
+        expect_raises(Purl::Error, /scheme must be 'pkg'/) do
+          Purl::PackageURL.parse("p\u212Ag:npm/pkg")
+        end
+      end
+
+      it "does not fold a non-ASCII letter into a qualifier key" do
+        expect_raises(Purl::Error, /Invalid qualifier key/) do
+          Purl::PackageURL.new("npm", nil, "pkg", nil, {"\u212Aey" => "x"})
+        end
+      end
+
       it "allows valid qualifier keys with dots, underscores, hyphens" do
         p = Purl::PackageURL.new("npm", nil, "pkg", nil, {"repo_url" => "https://example.com", "vcs.type" => "git", "build-id" => "123"})
         p.qualifiers.should_not be_nil
@@ -1320,6 +1364,17 @@ describe Purl do
       it "enforces the permitted characters of a version" do
         expect_raises(Purl::Error, /Invalid version '1.2.3-beta'/) do
           Purl::PackageURL.parse("pkg:chrome-extension/dlpngalgnefjeiefhmpklpfiohadpglk@1.2.3-beta")
+        end
+      end
+
+      # The definition's `^\d+(\.\d+){0,3}$` is an ECMA-262 pattern, where
+      # `\d` is [0-9]. Crystal's `\d` also matches other Unicode digits.
+      it "rejects non-ASCII digits in a chrome-extension version" do
+        expect_raises(Purl::Error, /Invalid version/) do
+          Purl::PackageURL.new("chrome-extension", nil, "dlpngalgnefjeiefhmpklpfiohadpglk", "\u0661.\u0660")
+        end
+        expect_raises(Purl::Error, /Invalid version/) do
+          Purl::PackageURL.parse("pkg:chrome-extension/dlpngalgnefjeiefhmpklpfiohadpglk@%EF%BC%91")
         end
       end
 

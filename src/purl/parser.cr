@@ -5,7 +5,7 @@ module Purl
   # specified by the purl spec (ECMA-427).
   module Parser
     # Valid qualifier key pattern: starts with lowercase letter, contains only [a-z0-9._\-]
-    QUALIFIER_KEY_PATTERN = /^[a-z][a-z0-9._\-]*$/
+    QUALIFIER_KEY_PATTERN = PackageURL::QUALIFIER_KEY_PATTERN
 
     # Parses a Package URL string and returns a PackageURL instance.
     def self.parse(purl_string : String) : PackageURL
@@ -36,7 +36,7 @@ module Purl
       scheme = remainder[...idx]
       remainder = remainder[(idx + 1)..]
 
-      unless scheme.downcase == PackageURL::SCHEME
+      unless scheme.downcase(Unicode::CaseOptions::ASCII) == PackageURL::SCHEME
         raise Purl::Error.new("Invalid Package URL: scheme must be 'pkg', got '#{scheme}'")
       end
 
@@ -46,7 +46,7 @@ module Purl
       # Step 4: Split off type from left side using first `/`
       idx = remainder.index('/')
       raise Purl::Error.new("Invalid Package URL: missing type or name") unless idx
-      type = remainder[...idx].downcase
+      type = remainder[...idx].downcase(Unicode::CaseOptions::ASCII)
       remainder = remainder[(idx + 1)..]
 
       # Step 5: Split off version from right side using `@`.
