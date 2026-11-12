@@ -16,7 +16,7 @@ require "json"
 # stays honest rather than turning into a dumping ground for anything
 # inconvenient.
 #
-# All of them come down to two places where the suite contradicts a
+# Most of them come down to two places where the suite contradicts a
 # normative rule this library follows instead:
 #
 #  1. ECMA-427 says a qualifier "key shall be composed only of lowercase
@@ -30,6 +30,16 @@ require "json"
 #  2. git-definition.json declares the namespace and name `case_sensitive:
 #     true`, so their case is preserved. One `recommended` case expects them
 #     lowercased instead.
+#
+# Two more are plain data errors upstream: the new pypi normalization pair
+# put the `expected_message` text into the `subpath` field. The parse case
+# expects a subpath from an input that has no '#', and the build case
+# expects no subpath in the output although its input carries one. Both
+# cases still pin the name normalization, which the other cases with the
+# same description cover.
+#
+# An entry may name the exact `input` when one description is shared by
+# several cases of the same `test_type`.
 KNOWN_UNSUPPORTED = {
   "gem-test.json" => [
     {"Ruby gems can use qualifiers. Roundtrip an input purl to canonical.", "validate"},
@@ -45,6 +55,10 @@ KNOWN_UNSUPPORTED = {
   ],
   "git-test.json" => [
     {"git namespace and name should be lowercased. Validate an input purl.", "validate"},
+  ],
+  "pypi-test.json" => [
+    {"pypi names have normalization rules.", "parse", "pkg:pypi/My.PyPI_.--._Package@1.11.1.dev1"},
+    {"pypi names have normalization rules.", "build"},
   ],
 }
 
@@ -84,11 +98,12 @@ private def expected_components(object : JSON::Any)
   }
 end
 
-private def unsupported?(file : String, description : String, kind : String) : Bool
+private def unsupported?(file : String, description : String, kind : String, input : JSON::Any) : Bool
   # The suite reuses a base description and appends a ". Roundtrip ..."
   # suffix for the derived cases, so both halves of the pair must match.
-  KNOWN_UNSUPPORTED.fetch(File.basename(file)) { return false }
-    .any? { |(d, k)| d == description && k == kind }
+  KNOWN_UNSUPPORTED.fetch(File.basename(file)) { return false }.any? do |entry|
+    entry[0] == description && entry[1] == kind && (entry.size < 3 || entry[2]? == input.as_s?)
+  end
 end
 
 describe "purl-spec conformance suite" do
@@ -100,7 +115,7 @@ describe "purl-spec conformance suite" do
       description = test["description"].as_s
       kind = test["test_type"].as_s
       group = test["test_group"].as_s
-      next if unsupported?(path, description, kind)
+      next if unsupported?(path, description, kind, test["input"])
 
       it "#{File.basename(path)} ##{index} #{group} #{kind}: #{description}" do
         expect_failure = test["expected_failure"]?.try(&.as_bool?) || false

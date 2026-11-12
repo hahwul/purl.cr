@@ -75,7 +75,10 @@ module Purl
     private def self.normalize_name_part(type : String, name : String) : String
       case type
       when "pypi"
-        name.gsub('_', '-').downcase
+        # The pypi definition: "The name shall be lowercase" and "Replace
+        # runs of consecutive dash '-', underscore '_', or dot '.' characters
+        # with a single dash '-'" (PEP 503 name normalization).
+        name.downcase.gsub(/[-_.]+/, '-')
       when "pub"
         # pub names are lowercased and any char outside [a-z0-9_] becomes '_'.
         name.downcase.gsub(/[^a-z0-9_]/, '_')

@@ -95,6 +95,15 @@ describe Purl do
         p.name.should eq("my-package")
       end
 
+      it "collapses runs of pypi '-', '_' and '.' into a single hyphen" do
+        Purl::PackageURL.new("pypi", nil, "friendly.bard").name.should eq("friendly-bard")
+        Purl::PackageURL.new("pypi", nil, "friendly--bard").name.should eq("friendly-bard")
+        Purl::PackageURL.parse("pkg:pypi/My.PyPI_.--._Package@1.0").to_s
+          .should eq("pkg:pypi/my-pypi-package@1.0")
+        Purl::PackageURL.parse("pkg:pypi/zope.interface")
+          .should eq(Purl::PackageURL.parse("pkg:pypi/zope-interface"))
+      end
+
       it "preserves npm name case" do
         # The npm type definition declares the name case sensitive: mixed-case
         # packages published before 2015 were grandfathered in and lowercasing
