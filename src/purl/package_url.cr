@@ -17,10 +17,11 @@ module Purl
     # Valid type pattern: starts with letter, contains only [a-zA-Z0-9.\-].
     # ECMA-427: the type "shall be composed only of ASCII letters and numbers,
     # period '.', and dash '-'" and "shall start with an ASCII letter".
-    TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9.\-]*$/
+    # Anchored with `\A`/`\z`: `$` would also accept a trailing newline.
+    TYPE_PATTERN = /\A[a-zA-Z][a-zA-Z0-9.\-]*\z/
 
     # Valid qualifier key pattern: starts with lowercase letter, contains only [a-z0-9._\-]
-    QUALIFIER_KEY_PATTERN = /^[a-z][a-z0-9._\-]*$/
+    QUALIFIER_KEY_PATTERN = /\A[a-z][a-z0-9._\-]*\z/
 
     getter type : String
     getter namespace : String?
@@ -58,7 +59,9 @@ module Purl
         raise Purl::Error.new("Invalid Package URL: components must be valid UTF-8")
       end
 
-      @type = type.downcase
+      # ASCII-only folding: the type is ASCII by definition, and a Unicode
+      # downcase would turn the KELVIN SIGN (U+212A) into a valid "k".
+      @type = type.downcase(Unicode::CaseOptions::ASCII)
 
       raise Purl::Error.new("Invalid type: type must not be empty") if @type.empty?
       unless TYPE_PATTERN.matches?(@type)
@@ -187,7 +190,7 @@ module Purl
         # caller-supplied key is normalized here. A key parsed out of a purl
         # string is *rejected* instead, because ECMA-427 requires the key to
         # already be lowercase in a valid purl — see `Parser.parse_qualifiers`.
-        k = key.downcase
+        k = key.downcase(Unicode::CaseOptions::ASCII)
         next if value.strip.empty?
         unless QUALIFIER_KEY_PATTERN.matches?(k)
           raise Purl::Error.new("Invalid qualifier key '#{k}': must start with a letter and contain only lowercase ASCII letters, digits, '.', '_' or '-'")

@@ -79,7 +79,8 @@ module Purl
         name.downcase.gsub(/[-_.]+/, '-')
       when "pub"
         # pub names are lowercased and any char outside [a-z0-9_] becomes '_'.
-        name.downcase.gsub(/[^a-z0-9_]/, '_')
+        # ASCII-only folding, so a non-ASCII letter is replaced, not folded.
+        name.downcase(Unicode::CaseOptions::ASCII).gsub(/[^a-z0-9_]/, '_')
       when .in?(LOWERCASE_NAME_TYPES)
         name.downcase
       else

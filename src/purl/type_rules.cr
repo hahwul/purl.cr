@@ -39,7 +39,9 @@ module Purl
     # `version_definition.permitted_characters` for the types that pin one.
     VERSION_PATTERNS = {
       # A Chrome extension version is one to four dot-separated numbers.
-      "chrome-extension" => /\A\d+(\.\d+){0,3}\z/,
+      # The definition's `\d` is ECMA-262's [0-9]; Crystal's `\d` also
+      # matches other Unicode digits.
+      "chrome-extension" => /\A[0-9]+(\.[0-9]+){0,3}\z/,
     }
 
     # Qualifier keys whose definition marks them `requirement: "required"`.

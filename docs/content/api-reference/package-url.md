@@ -112,5 +112,5 @@ Returns a hash value based on all components. Allows `PackageURL` to be used as 
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `SCHEME` | `"pkg"` | The purl URL scheme |
-| `TYPE_PATTERN` | `/^[a-zA-Z][a-zA-Z0-9.\-]*$/` | Valid type regex |
-| `QUALIFIER_KEY_PATTERN` | `/^[a-z][a-z0-9._\-]*$/` | Valid qualifier key regex |
+| `TYPE_PATTERN` | `/\A[a-zA-Z][a-zA-Z0-9.\-]*\z/` | Valid type regex |
+| `QUALIFIER_KEY_PATTERN` | `/\A[a-z][a-z0-9._\-]*\z/` | Valid qualifier key regex |
