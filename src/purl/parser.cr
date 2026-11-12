@@ -53,6 +53,16 @@ module Purl
       type = remainder[...idx].downcase
       remainder = remainder[(idx + 1)..]
 
+      # Trailing slashes after the name are not significant: ECMA-427 5.6.4
+      # says they "should be stripped. They are not part of the name", and
+      # how-to-parse strips them before splitting off the name. So
+      # `pkg:npm/foo/` names "foo", just as building with the name "foo/"
+      # does. They are stripped before the version split, not after it,
+      # because a slash right before the `@` leaves no name at all: the
+      # conformance suite requires `pkg:swift/github.com/Alamofire/@5.4.3`
+      # to fail.
+      remainder = remainder.rstrip('/')
+
       # Step 5: Split off version from right side using `@`.
       #
       # The version is a single opaque component, not a `/`-separated path, so

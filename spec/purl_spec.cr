@@ -676,6 +676,20 @@ describe Purl do
         end
       end
 
+      it "strips trailing slashes after the name" do
+        Purl::PackageURL.parse("pkg:npm/foo/").to_s.should eq("pkg:npm/foo")
+        Purl::PackageURL.parse("pkg:npm/ns/foo//?a=b#sub").to_s.should eq("pkg:npm/ns/foo?a=b#sub")
+        Purl::PackageURL.parse("pkg:git/codeberg.org/forgejo/forgejo/").to_s
+          .should eq("pkg:git/codeberg.org/forgejo/forgejo")
+        Purl::PackageURL.parse("pkg:npm/foo/").should eq(Purl::PackageURL.new("npm", nil, "foo/"))
+      end
+
+      it "still rejects a purl that is only slashes after the type" do
+        expect_raises(Purl::Error, /name must not be empty/) do
+          Purl::PackageURL.parse("pkg:npm//")
+        end
+      end
+
       it "parses a purl with all components" do
         p = Purl::PackageURL.parse("pkg:npm/%40angular/animation@12.3.1?repository_url=https://example.com#src/main")
         p.type.should eq("npm")
