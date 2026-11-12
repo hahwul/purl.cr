@@ -25,7 +25,7 @@ Purl::PackageURL.new("", nil, "name")
 # Invalid characters in type
 Purl::PackageURL.new("123invalid", nil, "name")
 # => Purl::Error: Invalid type '123invalid': must start with a letter
-#    and contain only ASCII letters, digits, '.', '+' or '-'
+#    and contain only ASCII letters, digits, '.' or '-'
 ```
 
 ### Invalid Name

@@ -8,6 +8,12 @@ and run by `spec/conformance_spec.cr`.
 
 ### Fixed
 
+- pypi names collapse each run of `-`, `_` and `.` into a single `-`, as the
+  pypi type definition (PEP 503) requires: `pkg:pypi/zope.interface` is now
+  `pkg:pypi/zope-interface`. Purls stored in the old form compare unequal to
+  the new one.
+- Trailing slashes after the name are stripped when parsing, so
+  `pkg:npm/foo/` parses as `foo` instead of raising.
 - Percent-encoding now follows ECMA-427 clause 5.4: `:` is never encoded
   (so `@sha256:...` and deb epochs such as `@1:2.4.47-2` stay readable), and
   `/` is encoded in qualifier values (`repository_url=https:%2F%2F...`).

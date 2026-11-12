@@ -95,6 +95,17 @@ describe Purl do
         p.name.should eq("my-package")
       end
 
+      it "collapses runs of pypi '-', '_' and '.' into a single hyphen" do
+        Purl::PackageURL.new("pypi", nil, "friendly.bard").name.should eq("friendly-bard")
+        Purl::PackageURL.new("pypi", nil, "friendly--bard").name.should eq("friendly-bard")
+        Purl::PackageURL.new("pypi", nil, "My.PyPI_.--._Package", "1.11.1.dev1").to_s
+          .should eq("pkg:pypi/my-pypi-package@1.11.1.dev1")
+        Purl::PackageURL.parse("pkg:pypi/My.PyPI_.--._Package@1.0").to_s
+          .should eq("pkg:pypi/my-pypi-package@1.0")
+        Purl::PackageURL.parse("pkg:pypi/zope.interface")
+          .should eq(Purl::PackageURL.parse("pkg:pypi/zope-interface"))
+      end
+
       it "preserves npm name case" do
         # The npm type definition declares the name case sensitive: mixed-case
         # packages published before 2015 were grandfathered in and lowercasing
@@ -664,6 +675,27 @@ describe Purl do
       it "still rejects a trailing empty name before a version" do
         expect_raises(Purl::Error, /name must not be empty/) do
           Purl::PackageURL.parse("pkg:swift/github.com/Alamofire/@5.4.3")
+        end
+      end
+
+      it "strips trailing slashes after the name" do
+        Purl::PackageURL.parse("pkg:npm/foo/").to_s.should eq("pkg:npm/foo")
+        Purl::PackageURL.parse("pkg:npm/ns/foo//?a=b#sub").to_s.should eq("pkg:npm/ns/foo?a=b#sub")
+        Purl::PackageURL.parse("pkg:git/codeberg.org/forgejo/forgejo/").to_s
+          .should eq("pkg:git/codeberg.org/forgejo/forgejo")
+        Purl::PackageURL.parse("pkg:npm/foo/").should eq(Purl::PackageURL.new("npm", nil, "foo/"))
+      end
+
+      it "keeps a slash after the version in the version, as the right-to-left split does" do
+        p = Purl::PackageURL.parse("pkg:npm/foo@1.0/")
+        p.name.should eq("foo")
+        p.version.should eq("1.0/")
+        p.to_s.should eq("pkg:npm/foo@1.0%2F")
+      end
+
+      it "still rejects a purl that is only slashes after the type" do
+        expect_raises(Purl::Error, /name must not be empty/) do
+          Purl::PackageURL.parse("pkg:npm//")
         end
       end
 

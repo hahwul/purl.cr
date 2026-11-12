@@ -51,17 +51,19 @@ purl.qualifiers # => {"packaging" => "jar"}
 purl.subpath    # => nil
 ```
 
-## Modifying Components
+## Changing Components
 
-Properties are mutable using Crystal's `property` syntax:
+A `PackageURL` is an immutable value: its components are read-only, because `==` and `#hash` are derived from them. To change one, build a new purl from the old one's components:
 
 ```crystal
 purl = Purl::PackageURL.new("npm", nil, "express", "4.18.0")
 
-purl.version = "4.19.0"
-purl.qualifiers = {"engine" => "node"}
+updated = Purl::PackageURL.new(
+  purl.type, purl.namespace, purl.name, "4.19.0",
+  qualifiers: {"engine" => "node"}, subpath: purl.subpath
+)
 
-puts purl.to_s
+puts updated.to_s
 # => "pkg:npm/express@4.19.0?engine=node"
 ```
 
@@ -75,7 +77,7 @@ puts purl.to_s
 # => "pkg:pypi/django-rest-framework@3.14.0"
 ```
 
-Note how the name is automatically normalized per PyPI conventions (underscores replaced with hyphens, lowercased).
+Note how the name is automatically normalized per PyPI conventions (lowercased, with each run of `-`, `_` and `.` replaced by a single hyphen).
 
 ## Equality
 

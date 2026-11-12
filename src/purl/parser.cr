@@ -67,6 +67,15 @@ module Purl
       if idx = version_separator_index(remainder)
         version = URI.decode(remainder[(idx + 1)..])
         remainder = remainder[...idx]
+      else
+        # how-to-parse strips "all trailing '/' characters" before splitting
+        # off the name, and ECMA-427 5.6.4 says they "are not significant and
+        # should be stripped", so `pkg:npm/foo/` names "foo", just as building
+        # with the name "foo/" does. This only applies when no version
+        # follows: a slash right before the `@` leaves no name at all, and
+        # the conformance suite requires `pkg:swift/github.com/Alamofire/@5.4.3`
+        # to fail.
+        remainder = remainder.rstrip('/')
       end
 
       # Step 6: Split off name from right side using last `/`. Each segment
@@ -110,7 +119,9 @@ module Purl
     # keeps genuinely nameless purls invalid, since `pkg:cran/@0.9.1` still
     # splits into an empty name and the version "0.9.1".
     private def self.version_separator_index(remainder : String) : Int32?
-      segment_start = (slash = remainder.rindex('/')) ? slash + 1 : 0
+      # Trailing slashes do not open a new segment: in `foo@1.0/` the `@`
+      # still sits in the last one, as the right-to-left split finds it.
+      segment_start = (slash = remainder.rstrip('/').rindex('/')) ? slash + 1 : 0
       idx = remainder.rindex('@')
       idx && idx >= segment_start ? idx : nil
     end
