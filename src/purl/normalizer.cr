@@ -11,7 +11,7 @@ module Purl
 
       name = name.strip('/')
       case type
-      when "chrome-extension"
+      when "chrome-extension", "luarocks"
         name.downcase(Unicode::CaseOptions::ASCII)
       when "pypi"
         lowercase(name).gsub(/[-_.]+/, '-')
@@ -27,6 +27,8 @@ module Purl
     def self.normalize_namespace(type : String, namespace : String) : String
       namespace.split('/', remove_empty: true).join('/') do |segment|
         case type
+        when "luarocks"
+          segment.downcase(Unicode::CaseOptions::ASCII)
         when .in?(LOWERCASE_NAMESPACE_TYPES)
           lowercase(segment)
         when .in?(UPCASE_NAMESPACE_TYPES)
@@ -37,19 +39,19 @@ module Purl
       end
     end
 
-    # Types whose name is declared case-insensitive and must be lowercased.
+    # Types whose name uses Unicode lowercase normalization.
     # These are the types whose definition sets `name_definition` to
     # `case_sensitive: false`, plus golang, whose definition keeps the flag
     # true but notes that "the name shall be lowercased".
     LOWERCASE_NAME_TYPES = %w[
       alpm apk bitbucket bitnami brew composer deb github
-      golang hex luarocks oci otp vscode-extension
+      golang hex oci otp vscode-extension
     ]
 
-    # Types whose namespace is declared case-insensitive and must be
-    # lowercased, again with golang added for its "shall be lowercased" note.
+    # Types whose namespace uses Unicode lowercase normalization, including
+    # golang for its "shall be lowercased" note.
     LOWERCASE_NAMESPACE_TYPES = %w[
-      alpm apk bitbucket brew composer deb github golang hex luarocks qpkg rpm
+      alpm apk bitbucket brew composer deb github golang hex qpkg rpm
       vscode-extension yocto
     ]
 
@@ -86,15 +88,24 @@ module Purl
       false
     end
 
-    # Normalize Julia package UUIDs and case-insensitive OTP platform names.
+    # Normalize qualifier values according to their type's rules.
     def self.normalize_qualifier_value(type : String, key : String, value : String) : String
-      if type == "julia" && key == "uuid"
-        uuid = UUID.parse?(value) if value.size == 36
+      case {type, key}
+      when {"julia", "uuid"}
+        uuid = parse_hyphenated_uuid(value)
         raise Purl::Error.new("Invalid uuid for type 'julia': expected a package UUID") unless uuid
-        return uuid.to_s
+        uuid.to_s
+      when {"swid", "tag_id"}
+        parse_hyphenated_uuid(value).try(&.to_s) || value
+      when {"otp", "platform"}
+        lowercase(value)
+      else
+        value
       end
+    end
 
-      type == "otp" && key == "platform" ? lowercase(value) : value
+    private def self.parse_hyphenated_uuid(value : String) : UUID?
+      UUID.parse?(value) if value.size == 36
     end
 
     # Normalize a version according to its type's case sensitivity.

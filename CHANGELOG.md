@@ -8,6 +8,8 @@ and run by `spec/conformance_spec.cr`.
 
 ### Breaking
 
+- Bazel versions must use relaxed SemVer syntax. Julia package names must
+  omit the `.jl` suffix.
 - Repeated unencoded `#` separators and repeated unencoded `?` separators
   before the subpath now raise `Purl::Error`. Percent-encode `?` and `#` when
   they appear in qualifier values such as repository URLs.
@@ -41,6 +43,9 @@ and run by `spec/conformance_spec.cr`.
 
 ### Fixed
 
+- LuaRocks names and namespaces use ASCII lowercase normalization.
+- SWID GUID tag IDs serialize in lowercase. Other SWID tag IDs preserve
+  their spelling and compare without regard to case.
 - Redundant slashes before a `git` host are stripped during parsing. Julia
   package UUIDs and OTP `platform` qualifier values are lowercased.
 - The type and qualifier key patterns are anchored with `\A`/`\z`, so a
