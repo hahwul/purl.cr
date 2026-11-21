@@ -5,10 +5,15 @@ module Purl
   module Encoder
     private MALFORMED_ESCAPE = /%(?![0-9A-Fa-f]{2})/
 
+    # Checks the syntax of percent escapes without decoding the string.
+    def self.valid_percent_encoding?(value : String) : Bool
+      !MALFORMED_ESCAPE.matches?(value)
+    end
+
     # Decode a component exactly once. URI.decode leaves malformed escapes
     # as literal text, but a PURL's percent escapes must follow RFC 3986.
     def self.decode(value : String) : String
-      if MALFORMED_ESCAPE.matches?(value)
+      unless valid_percent_encoding?(value)
         raise Purl::Error.new("Invalid percent-encoding in '#{value}'")
       end
       URI.decode(value)

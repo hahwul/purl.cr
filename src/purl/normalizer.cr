@@ -1,4 +1,5 @@
 require "uri"
+require "uuid"
 
 module Purl
   # Handles type-specific normalization of purl components.
@@ -83,6 +84,17 @@ module Purl
       DATABRICKS_DOMAINS.any? { |domain| host == domain || host.ends_with?(".#{domain}") }
     rescue URI::Error | OverflowError
       false
+    end
+
+    # Normalize Julia package UUIDs and case-insensitive OTP platform names.
+    def self.normalize_qualifier_value(type : String, key : String, value : String) : String
+      if type == "julia" && key == "uuid"
+        uuid = UUID.parse?(value) if value.size == 36
+        raise Purl::Error.new("Invalid uuid for type 'julia': expected a package UUID") unless uuid
+        return uuid.to_s
+      end
+
+      type == "otp" && key == "platform" ? lowercase(value) : value
     end
 
     # Normalize a version according to its type's case sensitivity.

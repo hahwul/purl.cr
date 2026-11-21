@@ -8,6 +8,16 @@ and run by `spec/conformance_spec.cr`.
 
 ### Breaking
 
+- Repeated unencoded `#` separators and repeated unencoded `?` separators
+  before the subpath now raise `Purl::Error`. Percent-encode `?` and `#` when
+  they appear in qualifier values such as repository URLs.
+- OCI names must contain a single repository segment. OCI versions use
+  `sha256:<hex>` and image tags belong in the `tag` qualifier. Abbreviated
+  digests are accepted for compatibility with the official examples.
+- Julia `uuid` values must use the hyphenated UUID form. Swift namespaces
+  must supply a source host and owner. Yocto repository URLs reject
+  malformed percent escapes, whitespace, invalid host separators and
+  out-of-range ports.
 - Names passed to the constructor and returned by `#name` use decoded text.
   Pass `foo/bar` to build `pkg:generic/foo%2Fbar`. Passing the text `foo%2Fbar`
   builds `pkg:generic/foo%252Fbar`.
@@ -31,6 +41,8 @@ and run by `spec/conformance_spec.cr`.
 
 ### Fixed
 
+- Redundant slashes before a `git` host are stripped during parsing. Julia
+  package UUIDs and OTP `platform` qualifier values are lowercased.
 - The type and qualifier key patterns are anchored with `\A`/`\z`, so a
   trailing newline (`pkg:npm\n/foo`, `?arch\n=x`) is rejected instead of
   serialized back out.
