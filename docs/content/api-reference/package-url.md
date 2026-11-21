@@ -95,7 +95,9 @@ Qualifiers are sorted alphabetically by key. Components are percent-encoded per 
 
 ### `#==(other : PackageURL) : Bool`
 
-Returns `true` if all normalized components match.
+Returns `true` if all normalized components match. For `swid`, `tag_id`
+comparison ignores case, and serialization preserves the spelling of
+non-GUID IDs.
 
 ```crystal
 a = Purl::PackageURL.parse("pkg:npm/%40babel/core@7.20.0")
@@ -105,7 +107,8 @@ a == b  # => true
 
 ### `#hash(hasher)`
 
-Returns a hash value based on all components. Allows `PackageURL` to be used as a Hash key.
+Returns a hash value using the same component rules as `#==`. Allows
+`PackageURL` to be used as a Hash key.
 
 ## Constants
 

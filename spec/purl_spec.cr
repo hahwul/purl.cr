@@ -200,6 +200,14 @@ describe Purl do
         p.name.should eq("DateTime")
       end
 
+      it "only lowercases ASCII in LuaRocks names and namespaces" do
+        p = Purl::PackageURL.new("luarocks", "ÉTEAM/KONG", "ÄRock", "1.0-RC1")
+        p.namespace.should eq("Éteam/Kong")
+        p.name.should eq("Ärock")
+        p.version.should eq("1.0-RC1")
+        Purl::PackageURL.parse(p.to_s).should eq(p)
+      end
+
       it "applies the Unicode full lowercase mapping where the type requires it" do
         p = Purl::PackageURL.new("hex", "ΟΣ/ΟΣΑ", "ΟΣ-ΟΣΑ.İ")
         p.namespace.should eq("ος/οσα")
@@ -1407,6 +1415,16 @@ describe Purl do
         p.to_s.should eq("pkg:julia/Dates?uuid=ade2ca70-3891-5945-98fb-dc099432e06a")
       end
 
+      it "rejects a repository suffix in place of a Julia package name" do
+        uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
+        expect_raises(Purl::Error, /must omit the '\.jl' suffix/) do
+          Purl::PackageURL.new("julia", nil, "Dates.jl", qualifiers: {"uuid" => uuid})
+        end
+        expect_raises(Purl::Error, /must omit the '\.jl' suffix/) do
+          Purl::PackageURL.parse("pkg:julia/Dates%2Ejl?uuid=#{uuid}")
+        end
+      end
+
       it "preserves the identity of OTP packages with case-insensitive platform names" do
         p = Purl::PackageURL.new("otp", nil, "crypto", qualifiers: {"Platform" => "LINUX", "arch" => "AMD64"})
         p.to_s.should eq("pkg:otp/crypto?arch=AMD64&platform=linux")
@@ -1479,6 +1497,27 @@ describe Purl do
         Purl::PackageURL.parse("pkg:swid/Acme/example.org/product?tag_id=id").namespace.should eq("Acme/example.org")
       end
 
+      it "canonicalizes a SWID GUID tag ID" do
+        tag_id = "75B8C285-FA7B-485B-B199-4745E3004D0D"
+        p = Purl::PackageURL.new("swid", nil, "App", qualifiers: {"tag_id" => tag_id})
+        input = "pkg:swid/App?tag_id=75b8c285-fa7b-485b-b199-4745e3004d0d"
+        p.to_s.should eq(input)
+        Purl::PackageURL.parse("pkg:swid/App?tag_id=#{tag_id}").to_s.should eq(input)
+      end
+
+      it "compares SWID tag IDs case-insensitively while preserving their written case" do
+        upper = Purl::PackageURL.parse("pkg:swid/App?tag_id=Example-Tag")
+        lower = Purl::PackageURL.parse("pkg:swid/App?tag_id=example-tag")
+        upper.to_s.should eq("pkg:swid/App?tag_id=Example-Tag")
+        lower.to_s.should eq("pkg:swid/App?tag_id=example-tag")
+        upper.should eq(lower)
+        upper.hash.should eq(lower.hash)
+        {upper => :found}[lower]?.should eq(:found)
+        upper.should_not eq(Purl::PackageURL.parse("pkg:swid/App?tag_id=example-tag&tag_version=2"))
+        Purl::PackageURL.parse("pkg:generic/App?tag_id=Example-Tag")
+          .should_not eq(Purl::PackageURL.parse("pkg:generic/App?tag_id=example-tag"))
+      end
+
       it "validates Hackage package names while preserving their case" do
         ["AC_HalfInteger", "AC--HalfInteger", "AC-123"].each do |name|
           expect_raises(Purl::Error, /Invalid name/) do
@@ -1499,6 +1538,24 @@ describe Purl do
           Purl::PackageURL.new("bazel", nil, "curl", subpath: "@@other//tools:binary")
         end
         Purl::PackageURL.parse("pkg:bazel/curl#tools:binary").subpath.should eq("tools:binary")
+      end
+
+      it "validates Bazel versions using relaxed SemVer syntax" do
+        ["1..2", "1.2-", "1.2+", "1.2-rc..1", "1.2+build..1", "1.2_rc1", "1.２"].each do |version|
+          expect_raises(Purl::Error, /Invalid version/) do
+            Purl::PackageURL.new("bazel", nil, "curl", version)
+          end
+        end
+        expect_raises(Purl::Error, /Invalid version/) do
+          Purl::PackageURL.parse("pkg:bazel/curl@1.2%5Frc1")
+        end
+
+        ["1", "01.2", "8.8.0.bcr.1", "v1.2-RC-1.alpha+build.2"].each do |version|
+          p = Purl::PackageURL.new("bazel", nil, "Curl", version)
+          p.version.should eq(version)
+          Purl::PackageURL.parse(p.to_s).should eq(p)
+        end
+        Purl::PackageURL.parse("pkg:bazel/curl").version.should be_nil
       end
 
       it "requires a Yocto repository URL scheme and host" do

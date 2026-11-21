@@ -30,6 +30,7 @@ module Purl
     getter subpath : String?
 
     @qualifiers : Hash(String, String)?
+    @comparison_qualifiers : Hash(String, String)?
 
     # The normalized qualifiers, or nil when there are none.
     #
@@ -76,6 +77,7 @@ module Purl
       # The qualifiers are normalized before the name because a few types
       # (mlflow) derive the name's case from the `repository_url` qualifier.
       @qualifiers = normalize_qualifiers(qualifiers)
+      @comparison_qualifiers = comparison_qualifiers(@qualifiers)
       @name = Normalizer.normalize_name_for_qualifiers(
         @type, Normalizer.normalize_name(@type, name), @qualifiers)
       @subpath = subpath ? Normalizer.normalize_subpath(@type, subpath) : nil
@@ -131,15 +133,14 @@ module Purl
       end
     end
 
-    # Equality comparison: two PackageURLs are equal if all normalized components match.
-    # Compares the qualifiers directly rather than through the getter, which
-    # copies.
+    # Compares the normalized components. SWID tag IDs compare without regard
+    # to case, while their serialized form can preserve the original spelling.
     def ==(other : PackageURL) : Bool
       @type == other.type &&
         @namespace == other.namespace &&
         @name == other.name &&
         @version == other.version &&
-        @qualifiers == other.@qualifiers &&
+        @comparison_qualifiers == other.@comparison_qualifiers &&
         @subpath == other.subpath
     end
 
@@ -148,7 +149,7 @@ module Purl
       hasher = @namespace.hash(hasher)
       hasher = @name.hash(hasher)
       hasher = @version.hash(hasher)
-      hasher = @qualifiers.hash(hasher)
+      hasher = @comparison_qualifiers.hash(hasher)
       hasher = @subpath.hash(hasher)
       hasher
     end
@@ -163,6 +164,14 @@ module Purl
     private def normalize_optional_namespace(type : String, namespace : String) : String?
       normalized = Normalizer.normalize_namespace(type, namespace)
       normalized.empty? ? nil : normalized
+    end
+
+    private def comparison_qualifiers(qualifiers : Hash(String, String)?) : Hash(String, String)?
+      return qualifiers unless @type == "swid" && qualifiers
+      return qualifiers unless tag_id = qualifiers["tag_id"]?
+
+      folded_id = tag_id.downcase(Unicode::CaseOptions::Fold)
+      folded_id == tag_id ? qualifiers : qualifiers.merge({"tag_id" => folded_id})
     end
 
     private def normalize_qualifiers(qualifiers : Hash(String, String)?) : Hash(String, String)?

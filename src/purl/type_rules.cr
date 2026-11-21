@@ -42,8 +42,11 @@ module Purl
       "hackage" => /\A[0-9]*[A-Za-z][A-Za-z0-9]*(?:-[0-9]*[A-Za-z][A-Za-z0-9]*)*\z/,
     }
 
-    # `version_definition.permitted_characters` for the types that pin one.
+    # Version syntax from the registered type definitions.
     VERSION_PATTERNS = {
+      # Bazel's relaxed SemVer permits any number of alphanumeric release
+      # identifiers and hyphens in prerelease or build identifiers.
+      "bazel" => /\A[0-9A-Za-z]++(?:\.[0-9A-Za-z]++)*+(?:-[0-9A-Za-z-]++(?:\.[0-9A-Za-z-]++)*+)?(?:\+[0-9A-Za-z-]++(?:\.[0-9A-Za-z-]++)*+)?\z/,
       # A Chrome extension version is one to four dot-separated numbers.
       # The definition's `\d` is ECMA-262's [0-9]; Crystal's `\d` also
       # matches other Unicode digits.
@@ -84,6 +87,10 @@ module Purl
 
       if type == "cpan" && name.includes?(MODULE_SEPARATOR)
         raise Purl::Error.new("Invalid name '#{name}' for type 'cpan': the name is a distribution name, which must not contain '::'")
+      end
+
+      if type == "julia" && name.ends_with?(".jl")
+        raise Purl::Error.new("Invalid name for type 'julia': must omit the '.jl' suffix")
       end
 
       if type == "oci" && name.includes?('/')
