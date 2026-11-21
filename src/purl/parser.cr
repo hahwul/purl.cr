@@ -1,5 +1,3 @@
-require "uri"
-
 module Purl
   # Parses Package URL strings following the right-to-left algorithm
   # specified by the purl spec (ECMA-427).
@@ -18,7 +16,7 @@ module Purl
       # Step 1: Split off the subpath from the right side using `#`
       subpath : String? = nil
       if idx = remainder.rindex('#')
-        subpath = decode_subpath(remainder[(idx + 1)..])
+        subpath = decode_path(remainder[(idx + 1)..], "subpath")
         remainder = remainder[...idx]
       end
 
@@ -49,19 +47,10 @@ module Purl
       type = remainder[...idx].downcase(Unicode::CaseOptions::ASCII)
       remainder = remainder[(idx + 1)..]
 
-      # Step 5: Split off version from right side using `@`.
-      #
-      # The version is a single opaque component, not a `/`-separated path, so
-      # an encoded slash carries no structural meaning there: `%2F` and a raw
-      # `/` denote the same character. It is therefore fully decoded (unlike
-      # namespace/name segments, where `%2F` must stay distinct from the
-      # segment separator). Decoding it as a segment would keep the literal
-      # "%2F" marker in the value and break round-tripping, because the
-      # encoder re-emits the marker verbatim: `pkg:npm/a@1/2` would parse to
-      # version "1/2", serialize to "1%2F2", and re-parse to "1%2F2".
+      # Step 5: Split off the opaque version from the name.
       version : String? = nil
       if idx = version_separator_index(remainder)
-        version = URI.decode(remainder[(idx + 1)..])
+        version = Encoder.decode(remainder[(idx + 1)..])
         remainder = remainder[...idx]
       else
         # how-to-parse strips "all trailing '/' characters" before splitting
@@ -74,33 +63,19 @@ module Purl
         remainder = remainder.rstrip('/')
       end
 
-      # Step 6: Split off name from right side using last `/`. Each segment
-      # is decoded via Encoder.decode_segment so an encoded slash (%2F)
-      # inside a single segment is preserved instead of being conflated
-      # with the structural separator (purl spec ECMA-427).
-      name : String
+      # A git namespace is the host and its name is the remaining repository
+      # path. Other types split off a single name from the right.
       namespace : String? = nil
-
       if type.in?(TypeRules::SLASHED_NAME_TYPES)
-        # A `git` name is the repository path on the host, so the split runs
-        # the other way: the first segment is the namespace (the host) and
-        # everything after it is the name, slashes and all. The generic
-        # right-to-left split would read `pkg:git/codeberg.org/forgejo/forgejo`
-        # as the namespace "codeberg.org/forgejo" and the name "forgejo".
-        segments = remainder.split("/").map { |seg| Encoder.decode_segment(seg) }
-        namespace = segments.shift?
-        namespace = nil if namespace.try(&.strip.empty?)
-        name = segments.join("/")
+        host, _, repository = remainder.partition('/')
+        namespace = Encoder.decode_segment(host, "namespace")
+        name = Encoder.decode(repository)
       elsif idx = remainder.rindex('/')
-        name = Encoder.decode_segment(remainder[(idx + 1)..])
-        namespace_raw = remainder[...idx]
-        namespace = namespace_raw.split("/").map { |seg| Encoder.decode_segment(seg) }.join("/")
-        namespace = nil if namespace.strip.empty?
+        namespace = decode_path(remainder[...idx], "namespace")
+        name = Encoder.decode(remainder[(idx + 1)..])
       else
-        name = Encoder.decode_segment(remainder)
+        name = Encoder.decode(remainder)
       end
-
-      raise Purl::Error.new("Invalid Package URL: name must not be empty") if name.strip.empty?
 
       PackageURL.new(type, namespace, name, version, qualifiers, subpath)
     end
@@ -122,31 +97,21 @@ module Purl
       idx && idx >= segment_start ? idx : nil
     end
 
-    # Decodes the subpath segment by segment, per how-to-parse: "Percent-decode
-    # each segment" and "Report an error if any segment contains a slash".
-    # ECMA-427 5.6.7 agrees that a decoded segment "shall not contain any
-    # slash". The decoded segments are joined with `/` for PackageURL, which
-    # takes its subpath as decoded text (it does not decode it again, so
-    # `#foo%252Fbar` stays the one segment "foo%2Fbar"), discards empty, `.`
-    # and `..` segments, and rejects invalid UTF-8.
-    private def self.decode_subpath(raw : String) : String
-      raw.split("/").join("/") do |seg|
-        decoded = URI.decode(seg)
-        if decoded.includes?('/')
-          raise Purl::Error.new("Invalid subpath: segment '#{seg}' contains an encoded slash")
-        end
-        decoded
-      end
+    private def self.decode_path(raw : String, component : String) : String
+      raw.split('/').join('/') { |segment| Encoder.decode_segment(segment, component) }
     end
 
     # Parses qualifier query string into a hash of key-value pairs.
     def self.parse_qualifiers(raw : String) : Hash(String, String)?
-      return if raw.strip.empty?
+      return if raw.empty?
       result = Hash(String, String).new
       raw.split("&").each do |pair|
         next if pair.empty?
-        key, _, value = pair.partition("=")
-        next if value.strip.empty?
+        key, separator, value = pair.partition('=')
+        if separator.empty?
+          raise Purl::Error.new("Invalid qualifier '#{pair}': expected a key=value pair")
+        end
+        next if value.empty?
         # ECMA-427: "The key shall be composed only of lowercase ASCII letters
         # and numbers, period '.', dash '-' and underscore '_'" and "shall not
         # be percent-encoded". A key that is not already lowercase makes the
@@ -164,7 +129,7 @@ module Purl
         if result.has_key?(key)
           raise Purl::Error.new("Duplicate qualifier key '#{key}': each key must appear at most once")
         end
-        result[key] = URI.decode(value)
+        result[key] = Encoder.decode(value)
       end
       result.empty? ? nil : result
     end

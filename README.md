@@ -38,6 +38,12 @@ purl = Purl::PackageURL.new(
 puts purl.to_s # => "pkg:deb/debian/curl@7.50.3-1?arch=amd64&distro=jessie"
 ```
 
+The constructor takes decoded component strings, and the getters return
+decoded values. For example, `foo/bar` in a `generic` name serializes as
+`foo%2Fbar`, and the literal text `foo%2Fbar` serializes as `foo%252Fbar`.
+A slash separates namespace and subpath segments. For `git` it also separates
+segments in the repository name.
+
 ## Contributing
 
 1. Fork it (<https://github.com/hahwul/purl.cr/fork>)
