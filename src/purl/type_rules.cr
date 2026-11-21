@@ -48,6 +48,8 @@ module Purl
       # The definition's `\d` is ECMA-262's [0-9]; Crystal's `\d` also
       # matches other Unicode digits.
       "chrome-extension" => /\A[0-9]+(\.[0-9]+){0,3}\z/,
+      # The official OCI examples and conformance suite use abbreviated digests.
+      "oci" => /\Asha256:[0-9a-f]{1,64}\z/,
     }
 
     # Qualifier keys whose definition marks them `requirement: "required"`.
@@ -62,6 +64,8 @@ module Purl
     MODULE_SEPARATOR = "::"
 
     private YOCTO_REPOSITORY_SCHEMES = %w[https http ssh git]
+    private INVALID_URL_CHARACTER    = /[\s\p{Cc}\\]/
+    private INVALID_HOST_CHARACTER   = /[\s\p{Cc}\\\/?#@]/
 
     # Raises `Purl::Error` when the already-normalized components violate the
     # purl type definition for `type`.
@@ -82,6 +86,10 @@ module Purl
         raise Purl::Error.new("Invalid name '#{name}' for type 'cpan': the name is a distribution name, which must not contain '::'")
       end
 
+      if type == "oci" && name.includes?('/')
+        raise Purl::Error.new("Invalid name for type 'oci': expected the last repository segment")
+      end
+
       if type == "bazel" && subpath.try(&.starts_with?('@'))
         raise Purl::Error.new("Invalid subpath for type 'bazel': the label must not include a repository name")
       end
@@ -92,9 +100,18 @@ module Purl
     end
 
     private def self.validate_yocto_repository_url(url : String) : Nil
+      if INVALID_URL_CHARACTER.matches?(url) || !Encoder.valid_percent_encoding?(url)
+        raise Purl::Error.new("Invalid repository_url for type 'yocto': malformed URL")
+      end
+
       uri = URI.parse(url)
-      unless uri.scheme.in?(YOCTO_REPOSITORY_SCHEMES) && uri.host.presence
+      host = uri.host
+      unless uri.scheme.in?(YOCTO_REPOSITORY_SCHEMES) && host && !host.empty? &&
+             host.valid_encoding? && !INVALID_HOST_CHARACTER.matches?(host)
         raise Purl::Error.new("Invalid repository_url for type 'yocto': expected an https, http, ssh, or git URL")
+      end
+      if (port = uri.port) && !port.in?(0..65535)
+        raise Purl::Error.new("Invalid repository_url for type 'yocto': port is out of range")
       end
     rescue URI::Error | OverflowError
       raise Purl::Error.new("Invalid repository_url for type 'yocto': malformed URL")
@@ -119,6 +136,10 @@ module Purl
 
       if type == "swid" && namespace && namespace.count('/') > 1
         raise Purl::Error.new("Invalid namespace for type 'swid': expected at most two segments")
+      end
+
+      if type == "swift" && namespace && !namespace.includes?('/')
+        raise Purl::Error.new("Invalid namespace for type 'swift': expected the source host and owner")
       end
     end
 

@@ -1190,6 +1190,24 @@ describe Purl do
     end
 
     describe "percent decoding" do
+      it "rejects repeated raw component separators before they can change the package identity" do
+        ["pkg:generic/example?repository_url=https://example.com/repo?q=v",
+         "pkg:generic/example#docs#readme"].each do |input|
+          expect_raises(Purl::Error, /Repeated unencoded/) do
+            Purl::PackageURL.parse(input)
+          end
+        end
+      end
+
+      it "preserves encoded separators in a qualifier URL" do
+        input = "pkg:generic/example?repository_url=https:%2F%2Fexample.com%2Frepo%3Fq%3Dv%23readme#docs"
+        p = Purl::PackageURL.parse(input)
+        p.name.should eq("example")
+        p.qualifiers.should eq({"repository_url" => "https://example.com/repo?q=v#readme"})
+        p.subpath.should eq("docs")
+        p.to_s.should eq(input)
+      end
+
       it "normalizes the decoded name and re-encodes the slash" do
         p = Purl::PackageURL.parse("pkg:hex/Foo%2fBar")
         p.name.should eq("foo/bar")
@@ -1376,6 +1394,59 @@ describe Purl do
         p.name.should eq("Dates")
       end
 
+      it "checks and normalizes the Julia package UUID" do
+        ["invalid", "ade2ca70x3891-5945-98fb-dc099432e06a"].each do |uuid|
+          expect_raises(Purl::Error, /Invalid uuid/) do
+            Purl::PackageURL.parse("pkg:julia/Dates?uuid=#{uuid}")
+          end
+        end
+        expect_raises(Purl::Error, /Invalid uuid/) do
+          Purl::PackageURL.new("julia", nil, "Dates", qualifiers: {"uuid" => " "})
+        end
+        p = Purl::PackageURL.parse("pkg:julia/Dates?uuid=ADE2CA70-3891-5945-98FB-DC099432E06A")
+        p.to_s.should eq("pkg:julia/Dates?uuid=ade2ca70-3891-5945-98fb-dc099432e06a")
+      end
+
+      it "preserves the identity of OTP packages with case-insensitive platform names" do
+        p = Purl::PackageURL.new("otp", nil, "crypto", qualifiers: {"Platform" => "LINUX", "arch" => "AMD64"})
+        p.to_s.should eq("pkg:otp/crypto?arch=AMD64&platform=linux")
+        Purl::PackageURL.parse("pkg:otp/crypto?platform=Linux&arch=AMD64").should eq(p)
+      end
+
+      it "requires an OCI version to have SHA-256 digest syntax and keeps tags in their qualifier" do
+        long_digest = "sha256:" + ("a" * 65)
+        ["latest", "sha256:", "sha256:badz", "sha512:abcd", long_digest].each do |version|
+          expect_raises(Purl::Error, /Invalid version/) do
+            Purl::PackageURL.new("oci", nil, "alpine", version)
+          end
+        end
+        expect_raises(Purl::Error, /Invalid version/) do
+          Purl::PackageURL.parse("pkg:oci/alpine@latest")
+        end
+        Purl::PackageURL.parse("pkg:oci/alpine?tag=latest").version.should be_nil
+        full_digest = "sha256:" + ("a" * 64)
+        Purl::PackageURL.parse("pkg:oci/alpine@#{full_digest}").version.should eq(full_digest)
+      end
+
+      it "requires the OCI name to be the last repository segment" do
+        expect_raises(Purl::Error, /Invalid name/) do
+          Purl::PackageURL.parse("pkg:oci/library%2Falpine")
+        end
+        expect_raises(Purl::Error, /Invalid name/) do
+          Purl::PackageURL.new("oci", nil, "library/alpine")
+        end
+      end
+
+      it "requires both the source host and owner in a Swift namespace" do
+        expect_raises(Purl::Error, /source host and owner/) do
+          Purl::PackageURL.parse("pkg:swift/github.com/Alamofire")
+        end
+        expect_raises(Purl::Error, /source host and owner/) do
+          Purl::PackageURL.new("swift", "github.com", "Alamofire")
+        end
+        Purl::PackageURL.parse("pkg:swift/gitlab.example.org/org/group/library").namespace.should eq("gitlab.example.org/org/group")
+      end
+
       it "rejects a cpan module name in place of a distribution name" do
         expect_raises(Purl::Error, /must not contain '::'/) do
           Purl::PackageURL.parse("pkg:cpan/URI::PackageURL")
@@ -1432,7 +1503,9 @@ describe Purl do
 
       it "requires a Yocto repository URL scheme and host" do
         ["ftp://example.org/layer", "example.org/layer", "https:layer", "https://example.org:bad/layer",
-         "https://example.org:99999999999999999999/layer"].each do |url|
+         "https://example.org:99999999999999999999/layer", "https://example.org:70000/layer",
+         "https://bad host/layer", "https://bad%20host/layer", "https://example.org/la\u0000yer",
+         "https://example.org%2Fextra/layer", "https://example.org/layer%ZZ"].each do |url|
           expect_raises(Purl::Error, /Invalid repository_url/) do
             Purl::PackageURL.new("yocto", "meta", "pkg", qualifiers: {"repository_url" => url})
           end
@@ -1442,9 +1515,12 @@ describe Purl do
         end
 
         %w[https http ssh git].each do |scheme|
-          p = Purl::PackageURL.new("yocto", "meta", "pkg", qualifiers: {"repository_url" => "#{scheme}://example.org/layer"})
+          p = Purl::PackageURL.new("yocto", "meta", "pkg", qualifiers: {"repository_url" => "#{scheme}://example.org/valid%20layer%2Ffile"})
           Purl::PackageURL.parse(p.to_s).should eq(p)
         end
+
+        ipv6 = Purl::PackageURL.new("yocto", "meta", "pkg", qualifiers: {"repository_url" => "ssh://git@[2001:db8::1]:22/layer"})
+        Purl::PackageURL.parse(ipv6.to_s).should eq(ipv6)
       end
     end
 
@@ -1452,6 +1528,13 @@ describe Purl do
     # Repository-path names (git)
     # =========================================================================
     describe "slashed names" do
+      it "strips redundant slashes before a git host" do
+        p = Purl::PackageURL.parse("pkg:git///github.com/org/repo@v1")
+        p.namespace.should eq("github.com")
+        p.name.should eq("org/repo")
+        p.to_s.should eq("pkg:git/github.com/org/repo@v1")
+      end
+
       it "splits a git purl into a host namespace and a repository path name" do
         p = Purl::PackageURL.parse("pkg:git/codeberg.org/forgejo/forgejo@a72d2c07")
         p.namespace.should eq("codeberg.org")

@@ -16,8 +16,10 @@ module Purl
       # Step 1: Split off the subpath from the right side using `#`
       subpath : String? = nil
       if idx = remainder.rindex('#')
-        subpath = decode_path(remainder[(idx + 1)..], "subpath")
+        raw_subpath = remainder[(idx + 1)..]
         remainder = remainder[...idx]
+        raise Purl::Error.new("Repeated unencoded '#' in Package URL") if remainder.includes?('#')
+        subpath = decode_path(raw_subpath, "subpath")
       end
 
       # Step 2: Split off the qualifiers from the right side using `?`
@@ -25,6 +27,7 @@ module Purl
       if idx = remainder.rindex('?')
         qualifiers_raw = remainder[(idx + 1)..]
         remainder = remainder[...idx]
+        raise Purl::Error.new("Repeated unencoded '?' in Package URL before the subpath") if remainder.includes?('?')
         qualifiers = parse_qualifiers(qualifiers_raw)
       end
 
@@ -67,7 +70,7 @@ module Purl
       # path. Other types split off a single name from the right.
       namespace : String? = nil
       if type.in?(TypeRules::SLASHED_NAME_TYPES)
-        host, _, repository = remainder.partition('/')
+        host, _, repository = remainder.lstrip('/').partition('/')
         namespace = Encoder.decode_segment(host, "namespace")
         name = Encoder.decode(repository)
       elsif idx = remainder.rindex('/')

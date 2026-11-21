@@ -185,7 +185,7 @@ module Purl
         if normalized.has_key?(k)
           raise Purl::Error.new("Duplicate qualifier key '#{k}': each key must appear at most once")
         end
-        normalized[k] = value
+        normalized[k] = Normalizer.normalize_qualifier_value(@type, k, value)
       end
       normalized.empty? ? nil : normalized
     end
