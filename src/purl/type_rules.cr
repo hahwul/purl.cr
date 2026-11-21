@@ -1,3 +1,5 @@
+require "uri"
+
 module Purl
   # Per-type component rules taken from the official purl type definitions
   # (https://github.com/package-url/purl-spec/tree/main/types). Every
@@ -34,6 +36,10 @@ module Purl
     NAME_PATTERNS = {
       # A Chrome Web Store extension ID is exactly 32 letters from a to p.
       "chrome-extension" => /\A[a-p]{32}\z/,
+      # A pod name cannot start with a dot or contain whitespace or '+'.
+      "cocoapods" => /\A(?!\.)[^\s+]+\z/,
+      # Hackage names use hyphen-separated ASCII words with a letter in each.
+      "hackage" => /\A[0-9]*[A-Za-z][A-Za-z0-9]*(?:-[0-9]*[A-Za-z][A-Za-z0-9]*)*\z/,
     }
 
     # `version_definition.permitted_characters` for the types that pin one.
@@ -55,6 +61,8 @@ module Purl
     # name "shall not contain the string '::'".
     MODULE_SEPARATOR = "::"
 
+    private YOCTO_REPOSITORY_SCHEMES = %w[https http ssh git]
+
     # Raises `Purl::Error` when the already-normalized components violate the
     # purl type definition for `type`.
     def self.validate(
@@ -63,6 +71,7 @@ module Purl
       name : String,
       version : String?,
       qualifiers : Hash(String, String)?,
+      subpath : String? = nil,
     ) : Nil
       validate_namespace(type, namespace)
       validate_pattern(NAME_PATTERNS[type]?, type, "name", name)
@@ -72,6 +81,23 @@ module Purl
       if type == "cpan" && name.includes?(MODULE_SEPARATOR)
         raise Purl::Error.new("Invalid name '#{name}' for type 'cpan': the name is a distribution name, which must not contain '::'")
       end
+
+      if type == "bazel" && subpath.try(&.starts_with?('@'))
+        raise Purl::Error.new("Invalid subpath for type 'bazel': the label must not include a repository name")
+      end
+
+      if type == "yocto" && (url = qualifiers.try(&.["repository_url"]?))
+        validate_yocto_repository_url(url)
+      end
+    end
+
+    private def self.validate_yocto_repository_url(url : String) : Nil
+      uri = URI.parse(url)
+      unless uri.scheme.in?(YOCTO_REPOSITORY_SCHEMES) && uri.host.presence
+        raise Purl::Error.new("Invalid repository_url for type 'yocto': expected an https, http, ssh, or git URL")
+      end
+    rescue URI::Error | OverflowError
+      raise Purl::Error.new("Invalid repository_url for type 'yocto': malformed URL")
     end
 
     private def self.validate_namespace(type : String, namespace : String?) : Nil
@@ -89,6 +115,10 @@ module Purl
       # parses back as the namespace "a" and the name "b/c".
       if namespace && namespace.includes?('/') && type.in?(SLASHED_NAME_TYPES)
         raise Purl::Error.new("Invalid Package URL: type '#{type}' namespace is the host and must be a single segment, got '#{namespace}'")
+      end
+
+      if type == "swid" && namespace && namespace.count('/') > 1
+        raise Purl::Error.new("Invalid namespace for type 'swid': expected at most two segments")
       end
     end
 

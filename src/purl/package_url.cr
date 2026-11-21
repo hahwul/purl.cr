@@ -42,6 +42,9 @@ module Purl
       @qualifiers.try(&.dup)
     end
 
+    # Builds a PURL from decoded components. Percent signs are literal.
+    # A slash separates segments in a namespace, subpath, or git repository
+    # name. In other names, a slash within the name is data.
     def initialize(
       type : String,
       namespace : String?,
@@ -68,24 +71,8 @@ module Purl
         raise Purl::Error.new("Invalid type '#{@type}': must start with a letter and contain only ASCII letters, digits, '.' or '-'")
       end
 
-      raise Purl::Error.new("Invalid name: name must not be empty") if name.strip.empty?
-
-      ns = namespace
-      if ns && ns.strip.empty?
-        ns = nil
-      end
-
-      # A blank version carries no information and is not part of the
-      # canonical form: `pkg:npm/foo@` and `pkg:npm/foo` denote the same
-      # package, so an empty (or whitespace-only) version collapses to nil
-      # rather than being serialized back as a dangling `@`.
-      ver = version
-      if ver && ver.strip.empty?
-        ver = nil
-      end
-
-      @namespace = ns ? normalize_optional_namespace(@type, ns) : nil
-      @version = ver ? Normalizer.normalize_version(@type, ver) : nil
+      @namespace = namespace ? normalize_optional_namespace(@type, namespace) : nil
+      @version = Normalizer.normalize_version(@type, version) if version && !version.empty?
       # The qualifiers are normalized before the name because a few types
       # (mlflow) derive the name's case from the `repository_url` qualifier.
       @qualifiers = normalize_qualifiers(qualifiers)
@@ -93,9 +80,9 @@ module Purl
         @type, Normalizer.normalize_name(@type, name), @qualifiers)
       @subpath = subpath ? Normalizer.normalize_subpath(@type, subpath) : nil
 
-      raise Purl::Error.new("Invalid name: name must not be empty") if @name.strip.empty?
+      raise Purl::Error.new("Invalid name: name must not be empty") if @name.empty?
 
-      TypeRules.validate(@type, @namespace, @name, @version, @qualifiers)
+      TypeRules.validate(@type, @namespace, @name, @version, @qualifiers, @subpath)
     end
 
     # Returns the Package URL as a string in the purl format.
@@ -110,20 +97,13 @@ module Purl
       io << SCHEME << ":" << @type
 
       if ns = @namespace
-        io << "/"
-        ns.split("/").each_with_index do |seg, i|
-          io << "/" if i > 0
-          io << Encoder.encode_component(seg)
-        end
+        write_path(io, "/", ns)
       end
 
-      # A `git` name is a repository path whose slashes are separators, so
-      # each of its segments is encoded on its own; every other type's name
-      # is a single segment where a slash is percent-encoded.
-      io << "/"
-      @name.split("/").each_with_index do |seg, i|
-        io << "/" if i > 0
-        io << Encoder.encode_component(seg)
+      if @type.in?(TypeRules::SLASHED_NAME_TYPES)
+        write_path(io, "/", @name)
+      else
+        io << "/" << Encoder.encode_literal(@name)
       end
 
       if ver = @version
@@ -134,16 +114,20 @@ module Purl
         io << "?"
         quals.keys.sort!.each_with_index do |key, i|
           io << "&" if i > 0
-          io << key << "=" << Encoder.encode_qualifier_value(quals[key])
+          io << key << "=" << Encoder.encode_literal(quals[key])
         end
       end
 
       if sub = @subpath
-        io << "#"
-        sub.split("/").each_with_index do |seg, i|
-          io << "/" if i > 0
-          io << Encoder.encode_literal(seg)
-        end
+        write_path(io, "#", sub)
+      end
+    end
+
+    private def write_path(io : IO, prefix : String, path : String) : Nil
+      io << prefix
+      path.split('/').each_with_index do |segment, index|
+        io << "/" if index > 0
+        io << Encoder.encode_literal(segment)
       end
     end
 
@@ -191,7 +175,7 @@ module Purl
         # string is *rejected* instead, because ECMA-427 requires the key to
         # already be lowercase in a valid purl — see `Parser.parse_qualifiers`.
         k = key.downcase(Unicode::CaseOptions::ASCII)
-        next if value.strip.empty?
+        next if value.empty?
         unless QUALIFIER_KEY_PATTERN.matches?(k)
           raise Purl::Error.new("Invalid qualifier key '#{k}': must start with a letter and contain only lowercase ASCII letters, digits, '.', '_' or '-'")
         end

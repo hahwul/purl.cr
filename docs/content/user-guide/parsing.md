@@ -21,7 +21,10 @@ The parser follows the right-to-left parsing algorithm specified by the purl spe
 5. Split off the **type** from the left using the first `/`
 6. Split off the **version** from the right using `@`; with no version, strip trailing slashes
 7. Split off the **name** from the right using the last `/`
-8. Remaining text becomes the **namespace**
+8. Split the remaining **namespace** on `/` and percent-decode each segment
+
+For `git`, the first segment after the type is the host namespace. The rest of
+the path forms the repository name.
 
 ## URL Variations
 
@@ -53,6 +56,10 @@ purl = Purl::PackageURL.parse("pkg:npm/%40angular/animation@12.3.1")
 purl.namespace  # => "@angular" (decoded from %40angular)
 ```
 
+An encoded slash inside a namespace or subpath segment raises `Purl::Error`.
+A `generic` name such as `foo%2Fbar` decodes to `foo/bar`. A name containing
+the literal text `foo%2Fbar` is encoded as `foo%252Fbar`.
+
 When generating a purl string with `to_s`, components are automatically percent-encoded:
 
 ```crystal
@@ -80,6 +87,6 @@ end
 begin
   Purl::PackageURL.parse("pkg:npm/")
 rescue ex : Purl::Error
-  puts ex.message  # => "Invalid Package URL: name must not be empty"
+  puts ex.message  # => "Invalid name: name must not be empty"
 end
 ```

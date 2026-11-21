@@ -67,13 +67,13 @@ purl = Purl::PackageURL.new(
   "npm", nil, "express", "4.18.0",
   qualifiers: {
     "Arch"    => "x64",
-    "empty"   => "  ",
+    "empty"   => "",
     "OS_Type" => "linux",
   }
 )
 puts "Normalized: #{purl}"
 puts "Qualifiers: #{purl.qualifiers}"
-# Keys lowercased, "empty" removed due to whitespace-only value
+# Keys are lowercased and "empty" is dropped.
 
 # --- Qualifiers are sorted alphabetically in output ---
 

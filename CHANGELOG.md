@@ -8,6 +8,14 @@ and run by `spec/conformance_spec.cr`.
 
 ### Breaking
 
+- Names passed to the constructor and returned by `#name` use decoded text.
+  Pass `foo/bar` to build `pkg:generic/foo%2Fbar`. Passing the text `foo%2Fbar`
+  builds `pkg:generic/foo%252Fbar`.
+- Parsing a namespace segment that decodes to contain `/` raises `Purl::Error`
+  under ECMA-427 5.6.3. Malformed percent escapes and qualifier entries missing
+  `=` also raise `Purl::Error`.
+- CocoaPods names, Hackage names, Bazel subpath labels, SWID namespaces and
+  Yocto `repository_url` values are checked against their type rules.
 - A subpath passed to the constructor is no longer percent-decoded. It is
   decoded text, like the version and qualifier values, so `subpath: "50%25"`
   keeps the literal `50%25` (serialized as `#50%2525`) instead of becoming
@@ -49,15 +57,15 @@ and run by `spec/conformance_spec.cr`.
   segment, fixing round-tripping for versions containing `/` or `%`.
 - Subpaths are decoded once rather than twice, and a literal `%` in a subpath
   segment no longer turns into a segment separator on re-parse.
-- Type-specific normalization no longer corrupts the `%2F` marker that stands
-  for an encoded slash inside a segment (`pkg:pub/Foo%2FBar` used to become
-  `foo_2fbar`).
+- Type-specific normalization acts on decoded names. For example, Pub
+  normalizes `pkg:pub/Foo%2FBar` to `pkg:pub/foo_bar`.
+- Unicode lowercasing handles Greek final sigma. OCI lowercases the entire
+  version. MLflow applies the Databricks case rule based on the tracking
+  server's hostname.
 - Added the missing case rules for `alpm`, `apk`, `bitnami`, `cpan`, `hex`,
   `luarocks` and `qpkg`.
-- A blank version collapses to nil instead of serializing as a dangling `@`,
-  and blank namespace and subpath segments are dropped.
-- A raw `/` in a constructed name is stored as the `%2F` marker, so a
-  constructed purl equals its own parsed form.
+- Empty versions, qualifier values, and namespace or subpath segments are
+  omitted. Whitespace-only values are preserved where their type allows them.
 - Duplicate qualifier keys are rejected instead of silently keeping the last
   value.
 - `#qualifiers` returns a copy, so mutating it can no longer break `==` and
